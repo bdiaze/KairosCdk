@@ -5,28 +5,28 @@ using System.Text.Json;
 
 namespace ApiCalendarizarProcesos.Helpers {
     public class DynamoHelper(IAmazonDynamoDB client) {
-        private readonly Dictionary<string, Table> tablas = [];
+        private readonly Dictionary<string, ITable> tablas = [];
 
-        private Table ObtenerTabla(string nombreTabla) {
-            if (!tablas.TryGetValue(nombreTabla, out Table? tabla)) {
-                tabla = new TableBuilder(client, nombreTabla).Build();
+        private ITable ObtenerTabla(string nombreTabla) {
+            if (!tablas.TryGetValue(nombreTabla, out ITable? tabla)) {
+                tabla = Table.LoadTable(client, nombreTabla);
                 tablas.Add(nombreTabla, tabla);
             }
             return tabla;
         }
 
         public async Task<Document> Crear(string nombreTabla, Document elemento) {
-            Table tabla = ObtenerTabla(nombreTabla);
+            ITable tabla = ObtenerTabla(nombreTabla);
             return await tabla.PutItemAsync(elemento);
         }
 
         public async Task<Document> Obtener(string nombreTabla, string key) {
-            Table tabla = ObtenerTabla(nombreTabla);
+            ITable tabla = ObtenerTabla(nombreTabla);
             return await tabla.GetItemAsync(key);
         }
 
         public async Task<List<Document>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
-            Table tabla = ObtenerTabla(nombreTabla);
+            ITable tabla = ObtenerTabla(nombreTabla);
 
             ISearch search = tabla.Query(new QueryOperationConfig {
                 IndexName = nombreIndice,
@@ -38,7 +38,7 @@ namespace ApiCalendarizarProcesos.Helpers {
         }
 
         public async Task<Document> Eliminar(string nombreTabla, string key) {
-            Table tabla = ObtenerTabla(nombreTabla);
+            ITable tabla = ObtenerTabla(nombreTabla);
             return await tabla.DeleteItemAsync(key);
         }
 

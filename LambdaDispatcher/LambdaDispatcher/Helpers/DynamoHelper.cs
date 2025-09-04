@@ -8,18 +8,18 @@ using System.Threading.Tasks;
 
 namespace LambdaDispatcher.Helpers {
     public class DynamoHelper(IAmazonDynamoDB client) {
-        private readonly Dictionary<string, Table> tablas = [];
+        private readonly Dictionary<string, ITable> tablas = [];
 
-        private Table ObtenerTabla(string nombreTabla) {
-            if (!tablas.TryGetValue(nombreTabla, out Table? tabla)) {
-                tabla = new TableBuilder(client, nombreTabla).Build();
+        private ITable ObtenerTabla(string nombreTabla) {
+            if (!tablas.TryGetValue(nombreTabla, out ITable? tabla)) {
+                tabla = Table.LoadTable(client, nombreTabla);
                 tablas.Add(nombreTabla, tabla);
             }
             return tabla;
         }
 
         public async Task<List<Document>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
-            Table tabla = ObtenerTabla(nombreTabla);
+            ITable tabla = ObtenerTabla(nombreTabla);
 
             ISearch search = tabla.Query(new QueryOperationConfig {
                 IndexName = nombreIndice,
