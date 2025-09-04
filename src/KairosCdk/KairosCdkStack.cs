@@ -151,6 +151,7 @@ namespace KairosCdk
                                     ],
                                     Resources = [
                                         tablaProcesos.TableArn,
+                                        $"{tablaProcesos.TableArn}/*",
                                     ],
                                 })
                             ]
@@ -280,7 +281,9 @@ namespace KairosCdk
                                     ],
                                     Resources = [
                                         tablaProcesos.TableArn,
-                                        tablaCalendarizacion.TableArn
+                                        $"{tablaProcesos.TableArn}/*",
+                                        tablaCalendarizacion.TableArn,
+                                        $"{tablaCalendarizacion.TableArn}/*",
                                     ],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
