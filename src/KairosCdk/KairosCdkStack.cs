@@ -166,6 +166,13 @@ namespace KairosCdk
                 },
                 Role = roleDispatcherLambda,
             });
+
+            StringParameter stringParameterDispatcherFunction = new(this, $"{appName}StringParameterDispatcherFunction", new StringParameterProps {
+                ParameterName = $"/{appName}/Dispatcher/LambdaArn",
+                Description = $"ARN del Lambda dispatcher de la aplicacion {appName}",
+                StringValue = dispatcherFunction.FunctionArn,
+                Tier = ParameterTier.STANDARD,
+            });
             #endregion
 
             #region Role para Scheduler
@@ -195,7 +202,7 @@ namespace KairosCdk
             });
 
             StringParameter stringParameterRoleScheduler = new(this, $"{appName}StringParameterRoleScheduler", new StringParameterProps {
-                ParameterName = $"/{appName}/Schedule/ArnRole",
+                ParameterName = $"/{appName}/Schedule/RoleArn",
                 Description = $"ARN del Rol para Schedule de la aplicacion {appName}",
                 StringValue = roleScheduler.RoleArn,
                 Tier = ParameterTier.STANDARD,
