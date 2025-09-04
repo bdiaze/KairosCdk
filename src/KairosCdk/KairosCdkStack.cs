@@ -282,6 +282,15 @@ namespace KairosCdk
                                         tablaProcesos.TableArn,
                                         tablaCalendarizacion.TableArn
                                     ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToIAM",
+                                    Actions = [
+                                        "iam:PassRole",
+                                    ],
+                                    Resources = [
+                                        roleScheduler.RoleArn
+                                    ],
                                 })
                             ]
                         })
