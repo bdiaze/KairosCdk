@@ -7,6 +7,7 @@ using ApiCalendarizarProcesos.Models;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace ApiCalendarizarProcesos.Endpoints {
@@ -27,7 +28,9 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
                     string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
                     string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
-                    string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/ScheduleGroup/Nombre");
+                    string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/NombreGrupo");
+                    string arnRoleSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/RoleArn");
+                    string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
 
                     // Se limpia la entrada...
                     entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ").ToUpperInvariant();
@@ -37,7 +40,17 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     string idCalendarizacion = $"calendarizacion-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Cron))}";
                     Schedule? scheduleExistente = await scheduler.Obtener(idCalendarizacion, nombreScheduleGroup);
                     if (scheduleExistente == null) {
-                        scheduleExistente = await scheduler.Crear(idCalendarizacion, $"Calendarizacion de {nombreAplicacion} para cron({entrada.Cron})", nombreScheduleGroup, entrada.Cron);
+                        scheduleExistente = await scheduler.Crear(
+                            idCalendarizacion, 
+                            $"Calendarizacion de {nombreAplicacion} para cron({entrada.Cron})", 
+                            nombreScheduleGroup, 
+                            entrada.Cron,
+                            arnRoleSchedule,
+                            arnLambdaDispatcher,
+                            JsonSerializer.Serialize(new DispatcherInput { 
+                                IdCalendarizacion = idCalendarizacion
+                            }, AppJsonSerializerContext.Default.DispatcherInput)
+                        );
                         if (scheduleExistente != null) {
                             await dynamo.Crear(nombreTablaCalendarizaciones, new Document {
                                 ["IdCalendarizacion"] = scheduleExistente.Nombre,

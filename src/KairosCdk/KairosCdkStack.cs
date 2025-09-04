@@ -245,7 +245,8 @@ namespace KairosCdk
                                     Resources = [
                                         stringParameterDynamoProcesos.ParameterArn,
                                         stringParameterDynamoCalendarizaciones.ParameterArn,
-                                        stringParameterRoleScheduler.ParameterArn
+                                        stringParameterRoleScheduler.ParameterArn,
+                                        stringParameterDispatcherFunction.ParameterArn,
                                     ],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
@@ -291,9 +292,6 @@ namespace KairosCdk
                 LogGroup = logGroup,
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
-                    { "PARAMETER_ARN_DYNAMO_PROCESOS", stringParameterDynamoProcesos.ParameterArn },
-                    { "PARAMETER_ARN_DYNAMO_CALENDARIZACIONES", stringParameterDynamoCalendarizaciones.ParameterArn },
-                    { "PARAMETER_ARN_SCHEDULE_ARN_ROLE", stringParameterRoleScheduler.ParameterArn },
                 },
                 Role = roleLambda,
             });
