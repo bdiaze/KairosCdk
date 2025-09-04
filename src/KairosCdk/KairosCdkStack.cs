@@ -6,6 +6,7 @@ using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Logs;
 using Amazon.CDK.AWS.Scheduler;
+using Amazon.CDK.AWS.SQS;
 using Amazon.CDK.AWS.SSM;
 using Constructs;
 using System;
@@ -76,9 +77,127 @@ namespace KairosCdk
             });
 
             StringParameter stringParameterScheduleGroup = new(this, $"{appName}StringParameterScheduleGroup", new StringParameterProps {
-                ParameterName = $"/{appName}/ScheduleGroup/Nombre",
+                ParameterName = $"/{appName}/Schedule/NombreGrupo",
                 Description = $"Nombre del Schedule Group de la aplicacion {appName}",
                 StringValue = scheduleGroup.Name,
+                Tier = ParameterTier.STANDARD,
+            });
+            #endregion
+
+            #region SQS y Lambda
+            string dispatcherDirectory = System.Environment.GetEnvironmentVariable("DISPATCHER_DIRECTORY") ?? throw new ArgumentNullException("DISPATCHER_DIRECTORY");
+            string dispatcherHandler = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_HANDLER") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_HANDLER");
+            string dispatcherTimeout = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_TIMEOUT");
+            string dispatcherMemorySize = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_MEMORY_SIZE");
+
+            // Creación de cola...
+            Queue queue = new(this, $"{appName}Queue", new QueueProps {
+                QueueName = $"{appName}Queue",
+                RetentionPeriod = Duration.Days(14),
+                VisibilityTimeout = Duration.Minutes(5),
+                EnforceSSL = true,
+            });
+
+            StringParameter stringParameterQueueUrl = new(this, $"{appName}StringParameterQueueUrl", new StringParameterProps {
+                ParameterName = $"/{appName}/SQS/QueueUrl",
+                Description = $"Queue URL de la aplicacion {appName}",
+                StringValue = queue.QueueUrl,
+                Tier = ParameterTier.STANDARD,
+            });
+
+            // Creación de log group lambda...
+            LogGroup dispatcherLogGroup = new(this, $"{appName}DispatcherLogGroup", new LogGroupProps {
+                LogGroupName = $"/aws/lambda/{appName}DispatcherLambdaFunction/logs",
+                RemovalPolicy = RemovalPolicy.DESTROY
+            });
+
+            // Creación de role para la función lambda...
+            IRole roleDispatcherLambda = new Role(this, $"{appName}DispatcherLambdaRole", new RoleProps {
+                RoleName = $"{appName}DispatcherLambdaRole",
+                Description = $"Role para Lambda dispatcher de {appName}",
+                AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
+                ManagedPolicies = [
+                    ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole"),
+                    ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+                ],
+                InlinePolicies = new Dictionary<string, PolicyDocument> {
+                    {
+                        $"{appName}DispatcherLambdaPolicy",
+                        new PolicyDocument(new PolicyDocumentProps {
+                            Statements = [
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToParameterStore",
+                                    Actions = [
+                                        "ssm:GetParameter"
+                                    ],
+                                    Resources = [
+                                        stringParameterQueueUrl.ParameterArn,
+                                    ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToSQS",
+                                    Actions = [
+                                        "sqs:SendMessage"
+                                    ],
+                                    Resources = [
+                                        queue.QueueArn
+                                    ],
+                                })
+                            ]
+                        })
+                    }
+                }
+            });
+
+            // Creación de la función lambda...
+            Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
+                FunctionName = $"{appName}DispatcherLambdaFunction",
+                Description = $"Función dispatcher encargada de ingresar los procesos a la cola de ejecución de la aplicacion {appName}",
+                Runtime = Runtime.DOTNET_8,
+                Handler = dispatcherHandler,
+                Code = Code.FromAsset($"{dispatcherDirectory}/publish/publish.zip"),
+                Timeout = Duration.Seconds(double.Parse(dispatcherTimeout)),
+                MemorySize = double.Parse(dispatcherMemorySize),
+                Architecture = Architecture.X86_64,
+                LogGroup = dispatcherLogGroup,
+                Environment = new Dictionary<string, string> {
+                    { "APP_NAME", appName },
+                    { "PARAMETER_ARN_SQS_QUEUE_URL", stringParameterQueueUrl.ParameterArn },
+                },
+                Role = roleDispatcherLambda,
+            });
+            #endregion
+
+            #region Role para Scheduler
+            // Creación de role usado por Scheduler para gatillar dispatcher lambda...
+            IRole roleScheduler = new Role(this, $"{appName}SchedulerRole", new RoleProps {
+                RoleName = $"{appName}SchedulerRole",
+                Description = $"Role para Scheduler de {appName}",
+                AssumedBy = new ServicePrincipal("scheduler.amazonaws.com"),
+                InlinePolicies = new Dictionary<string, PolicyDocument> {
+                    {
+                        $"{appName}SchedulerPolicy",
+                        new PolicyDocument(new PolicyDocumentProps {
+                            Statements = [
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToDispatcherLambda",
+                                    Actions = [
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    Resources = [
+                                        dispatcherFunction.FunctionArn
+                                    ],
+                                })
+                            ]
+                        })
+                    }
+                }
+            });
+
+            StringParameter stringParameterRoleScheduler = new(this, $"{appName}StringParameterRoleScheduler", new StringParameterProps {
+                ParameterName = $"/{appName}/Schedule/ArnRole",
+                Description = $"ARN del Rol para Schedule de la aplicacion {appName}",
+                StringValue = roleScheduler.RoleArn,
                 Tier = ParameterTier.STANDARD,
             });
             #endregion
@@ -119,6 +238,7 @@ namespace KairosCdk
                                     Resources = [
                                         stringParameterDynamoProcesos.ParameterArn,
                                         stringParameterDynamoCalendarizaciones.ParameterArn,
+                                        stringParameterRoleScheduler.ParameterArn
                                     ],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
@@ -166,6 +286,7 @@ namespace KairosCdk
                     { "APP_NAME", appName },
                     { "PARAMETER_ARN_DYNAMO_PROCESOS", stringParameterDynamoProcesos.ParameterArn },
                     { "PARAMETER_ARN_DYNAMO_CALENDARIZACIONES", stringParameterDynamoCalendarizaciones.ParameterArn },
+                    { "PARAMETER_ARN_SCHEDULE_ARN_ROLE", stringParameterRoleScheduler.ParameterArn },
                 },
                 Role = roleLambda,
             });
