@@ -112,7 +112,7 @@ namespace KairosCdk
             });
 
             // Creación de role para la función lambda...
-            IRole roleDispatcherLambda = new Role(this, $"{appName}DispatcherLambdaRole", new RoleProps {
+            Role roleDispatcherLambda = new(this, $"{appName}DispatcherLambdaRole", new RoleProps {
                 RoleName = $"{appName}DispatcherLambdaRole",
                 Description = $"Role para Lambda dispatcher de {appName}",
                 AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
@@ -186,7 +186,7 @@ namespace KairosCdk
 
             #region Role para Scheduler
             // Creación de role usado por Scheduler para gatillar dispatcher lambda...
-            IRole roleScheduler = new Role(this, $"{appName}SchedulerRole", new RoleProps {
+            Role roleScheduler = new(this, $"{appName}SchedulerRole", new RoleProps {
                 RoleName = $"{appName}SchedulerRole",
                 Description = $"Role para Scheduler de {appName}",
                 AssumedBy = new ServicePrincipal("scheduler.amazonaws.com"),
@@ -256,6 +256,7 @@ namespace KairosCdk
                                         stringParameterDynamoCalendarizaciones.ParameterArn,
                                         stringParameterRoleScheduler.ParameterArn,
                                         stringParameterDispatcherFunction.ParameterArn,
+                                        stringParameterScheduleGroup.ParameterArn,
                                     ],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
@@ -328,7 +329,7 @@ namespace KairosCdk
             });
 
             // Creación de la CfnApiMapping para el API Gateway...
-            CfnApiMapping apiMapping = new CfnApiMapping(this, $"{appName}APIApiMapping", new CfnApiMappingProps {
+            CfnApiMapping apiMapping = new(this, $"{appName}APIApiMapping", new CfnApiMappingProps {
                 DomainName = apiDomainName,
                 ApiMappingKey = apiMappingKey,
                 ApiId = lambdaRestApi.RestApiId,
