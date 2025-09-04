@@ -37,7 +37,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ").ToUpperInvariant();
 
                     // Se valida si existe el schedule, si no existe entonces se crea y registra en dynamoDB...
-                    string idCalendarizacion = $"calendarizacion-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Cron))}";
+                    string idCalendarizacion = $"calendarizacion-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Cron)).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
                     Schedule? scheduleExistente = await scheduler.Obtener(idCalendarizacion, nombreScheduleGroup);
                     if (scheduleExistente == null) {
                         scheduleExistente = await scheduler.Crear(
@@ -65,7 +65,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     }
 
                     // Se valida si ya existe el proceso en dynamoDB, si no existe entonces se registra...
-                    string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Nombre))}";
+                    string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Nombre)).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
                     Document procesoExistente = await dynamo.Obtener(nombreTablaProcesos, entrada.Nombre);
                     procesoExistente ??= await dynamo.Crear(nombreTablaProcesos, new Document {
                         ["IdProceso"] = idProceso,
