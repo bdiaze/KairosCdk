@@ -3,6 +3,7 @@ using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace LambdaDispatcher.Helpers {
     public class DynamoHelper(IAmazonDynamoDB client) {
-        public async Task<List<Dictionary<string, AttributeValue>>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
+        public async Task<List<Dictionary<string, object?>>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
             QueryRequest request = new() {
                 TableName = nombreTabla,
                 IndexName = nombreIndice,
@@ -27,7 +28,7 @@ namespace LambdaDispatcher.Helpers {
                 throw new Exception("Ocurrió un error al obtener por índice los ítems de Dynamo");
             }
 
-            return response.Items;
+            return [.. response.Items.Select(i => ToDict(i))];
         }
 
         public static string ToJson(Dictionary<string, AttributeValue> item) {
@@ -38,6 +39,18 @@ namespace LambdaDispatcher.Helpers {
             }
 
             return JsonSerializer.Serialize(dict);
+        }
+
+        private static Dictionary<string, object?>? ToDict(Dictionary<string, AttributeValue> item) {
+            if (item == null) return null;
+
+            Dictionary<string, object?> dict = [];
+
+            foreach (KeyValuePair<string, AttributeValue> kvp in item) {
+                dict[kvp.Key] = ConvertAttributeValue(kvp.Value);
+            }
+
+            return dict;
         }
 
         private static object? ConvertAttributeValue(AttributeValue av) {
@@ -72,6 +85,31 @@ namespace LambdaDispatcher.Helpers {
             }
 
             return null;
+        }
+
+        private static Dictionary<string, AttributeValue> ToAttributeMap(Dictionary<string, object?> dict) {
+            Dictionary<string, AttributeValue> result = [];
+
+            foreach (KeyValuePair<string, object?> kvp in dict) {
+                result[kvp.Key] = ToAttributeValue(kvp.Value);
+            }
+
+            return result;
+        }
+
+        private static AttributeValue ToAttributeValue(object? value) {
+            return value switch {
+                null => new AttributeValue { NULL = true },
+                string s => new AttributeValue { S = s },
+                int i => new AttributeValue { N = i.ToString() },
+                long l => new AttributeValue { N = l.ToString() },
+                double d => new AttributeValue { N = d.ToString(CultureInfo.InvariantCulture) },
+                float f => new AttributeValue { N = f.ToString(CultureInfo.InvariantCulture) },
+                bool b => new AttributeValue { BOOL = b },
+                IEnumerable<object> list => new AttributeValue { L = [.. list.Select(ToAttributeValue)] },
+                Dictionary<string, object?> map => new AttributeValue { M = ToAttributeMap(map) },
+                _ => new AttributeValue { S = value.ToString() }
+            };
         }
     }
 }

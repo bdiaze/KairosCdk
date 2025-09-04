@@ -53,31 +53,31 @@ namespace ApiCalendarizarProcesos.Endpoints {
                             }, AppJsonSerializerContext.Default.DispatcherInput)
                         );
                         if (scheduleExistente != null) {
-                            await dynamo.Insertar(nombreTablaCalendarizaciones, new Dictionary<string, AttributeValue> {
-                                ["IdCalendarizacion"] = new AttributeValue { S = scheduleExistente.Nombre } ,
-                                ["Nombre"] = new AttributeValue { S = scheduleExistente.Nombre },
-                                ["Descripcion"] = new AttributeValue { S = scheduleExistente.Descripcion },
-                                ["Grupo"] = new AttributeValue { S = scheduleExistente.Grupo },
-                                ["Cron"] = new AttributeValue { S = scheduleExistente.Cron },
-                                ["Arn"] = new AttributeValue { S = scheduleExistente.Arn },
-                                ["FechaCreacion"] = new AttributeValue { S = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture) },
+                            await dynamo.Insertar(nombreTablaCalendarizaciones, new Dictionary<string, object?> {
+                                ["IdCalendarizacion"] = scheduleExistente.Nombre,
+                                ["Nombre"] = scheduleExistente.Nombre,
+                                ["Descripcion"] = scheduleExistente.Descripcion,
+                                ["Grupo"] = scheduleExistente.Grupo,
+                                ["Cron"] = scheduleExistente.Cron,
+                                ["Arn"] = scheduleExistente.Arn,
+                                ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
                             });
                         }
                     }
 
                     // Se valida si ya existe el proceso en dynamoDB, si no existe entonces se registra...
                     string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Nombre)).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
-                    Dictionary<string, AttributeValue> procesoExistente = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, AttributeValue> {
-                        ["IdProceso"] = new AttributeValue { S = idProceso }
+                    Dictionary<string, object?>? procesoExistente = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, object?> {
+                        ["IdProceso"] = idProceso
                     });
-                    procesoExistente ??= await dynamo.Insertar(nombreTablaProcesos, new Dictionary<string, AttributeValue> {
-                        ["IdProceso"] = new AttributeValue { S = idProceso },
-                        ["IdCalendarizacion"] = new AttributeValue { S = idCalendarizacion },
-                        ["Nombre"] = new AttributeValue { S = entrada.Nombre },
-                        ["ArnProceso"] = new AttributeValue { S = entrada.ArnProceso },
-                        ["Parametros"] = new AttributeValue { S = entrada.Parametros },
-                        ["Habilitado"] = new AttributeValue { BOOL = entrada.Habilitado },
-                        ["FechaCreacion"] = new AttributeValue { S = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture) },
+                    procesoExistente ??= await dynamo.Insertar(nombreTablaProcesos, new Dictionary<string, object?> {
+                        ["IdProceso"] = idProceso,
+                        ["IdCalendarizacion"] = idCalendarizacion,
+                        ["Nombre"] = entrada.Nombre,
+                        ["ArnProceso"] = entrada.ArnProceso,
+                        ["Parametros"] = entrada.Parametros,
+                        ["Habilitado"] = entrada.Habilitado,
+                        ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
                     });
 
                     LambdaLogger.Log(
