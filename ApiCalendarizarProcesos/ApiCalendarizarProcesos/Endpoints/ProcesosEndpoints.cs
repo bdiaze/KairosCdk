@@ -119,11 +119,8 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
                     // Si el proceso existe, se elimina...
                     if (proceso != null && proceso.TryGetValue("IdProceso", out object? value)) {
-                        await dynamo.Eliminar(nombreTablaProcesos, new Dictionary<string, object?> {
-                            ["IdProceso"] = value
-                        });
 
-                        // Si no quedan más procesos en la calendarización, tambien se elimina ésta...
+                        // Antes de eliminar el proceso, si no quedan otros procesos en la calendarización, tambien se elimina ésta...
                         if (proceso.TryGetValue("IdCalendarizacion", out object? idCalendarizacion) && idCalendarizacion != null) {
                             List<Dictionary<string, object?>> procesos = await dynamo.ObtenerPorIndice(
                                 nombreTablaProcesos,
@@ -132,7 +129,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                                 (string)idCalendarizacion
                             );
 
-                            if (procesos.Count == 0) {
+                            if (procesos.Count == 1) {
                                 // Si existe el schedule de eventbridge, se elimina...
                                 Schedule? schedule = await scheduler.Obtener((string)idCalendarizacion, nombreScheduleGroup);
                                 if (schedule != null) {
@@ -150,6 +147,10 @@ namespace ApiCalendarizarProcesos.Endpoints {
                                 }
                             } 
                         }
+
+                        await dynamo.Eliminar(nombreTablaProcesos, new Dictionary<string, object?> {
+                            ["IdProceso"] = value
+                        });
                     }
 
                     LambdaLogger.Log(
