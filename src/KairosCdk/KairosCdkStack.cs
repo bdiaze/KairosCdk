@@ -131,6 +131,7 @@ namespace KairosCdk
                                         "ssm:GetParameter"
                                     ],
                                     Resources = [
+                                        stringParameterDynamoProcesos.ParameterArn,
                                         stringParameterQueueUrl.ParameterArn,
                                     ],
                                 }),
@@ -141,6 +142,15 @@ namespace KairosCdk
                                     ],
                                     Resources = [
                                         queue.QueueArn
+                                    ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToDynamoDB",
+                                    Actions = [
+                                        "dynamodb:Query"
+                                    ],
+                                    Resources = [
+                                        tablaProcesos.TableArn,
                                     ],
                                 })
                             ]
@@ -162,7 +172,6 @@ namespace KairosCdk
                 LogGroup = dispatcherLogGroup,
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
-                    { "PARAMETER_ARN_SQS_QUEUE_URL", stringParameterQueueUrl.ParameterArn },
                 },
                 Role = roleDispatcherLambda,
             });
