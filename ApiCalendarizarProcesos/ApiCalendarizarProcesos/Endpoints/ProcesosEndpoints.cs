@@ -16,6 +16,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
         public static IEndpointRouteBuilder MapProcesosEndpoints(this IEndpointRouteBuilder routes) {
             RouteGroupBuilder group = routes.MapGroup("/Procesos");
             group.MapPostEndpoint();
+            group.MapDeleteEndpoint();
 
             return routes;
         }
@@ -74,6 +75,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                         ["IdProceso"] = idProceso,
                         ["IdCalendarizacion"] = idCalendarizacion,
                         ["Nombre"] = entrada.Nombre,
+                        ["ArnRol"] = entrada.ArnRol,
                         ["ArnProceso"] = entrada.ArnProceso,
                         ["Parametros"] = entrada.Parametros,
                         ["Habilitado"] = entrada.Habilitado,
@@ -89,6 +91,76 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
                         $"Ocurrió un error al programar el proceso. " +
+                        $"{ex}");
+                    return Results.Problem("Ocurrió un error al procesar su solicitud.");
+                }
+            });
+
+            return routes;
+        }
+
+        private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
+            routes.MapDelete("/{idProceso}", async (string idProceso, VariableEntornoHelper variableEntorno, ParameterStoreHelper parameterStore, SchedulerHelper scheduler, DynamoHelper dynamo) => {
+                Stopwatch stopwatch = Stopwatch.StartNew();
+
+                try {
+                    string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
+
+                    string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
+                    string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
+                    string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/NombreGrupo");
+                    string arnRoleSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/RoleArn");
+                    string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
+
+                    // Se obtiene el proceso a eliminar...
+                    Dictionary<string, object?>? proceso = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, object?> {
+                        ["IdProceso"] = idProceso
+                    });
+
+                    // Si el proceso existe, se elimina...
+                    if (proceso != null && proceso.TryGetValue("IdProceso", out object? value)) {
+                        await dynamo.Eliminar(nombreTablaProcesos, new Dictionary<string, object?> {
+                            ["IdProceso"] = value
+                        });
+
+                        // Si no quedan más procesos en la calendarización, tambien se elimina ésta...
+                        if (proceso.TryGetValue("IdCalendarizacion", out object? idCalendarizacion) && idCalendarizacion != null) {
+                            List<Dictionary<string, object?>> procesos = await dynamo.ObtenerPorIndice(
+                                nombreTablaProcesos,
+                                "PorIdCalendarizacion",
+                                "IdCalendarizacion",
+                                (string)idCalendarizacion
+                            );
+
+                            if (procesos.Count == 0) {
+                                // Si existe el schedule de eventbridge, se elimina...
+                                Schedule? schedule = await scheduler.Obtener((string)idCalendarizacion, nombreScheduleGroup);
+                                if (schedule != null) {
+                                    await scheduler.Eliminar(schedule.Nombre, schedule.Grupo);
+                                }
+
+                                // Si existe el registro en dynamo, se elimina...
+                                Dictionary<string, object?>? calendarizacion = await dynamo.Obtener(nombreTablaCalendarizaciones, new Dictionary<string, object?> {
+                                    ["IdCalendarizacion"] = idCalendarizacion
+                                });
+                                if (calendarizacion != null) {
+                                    await dynamo.Eliminar(nombreTablaCalendarizaciones, new Dictionary<string, object?> {
+                                        ["IdCalendarizacion"] = idCalendarizacion
+                                    });
+                                }
+                            } 
+                        }
+                    }
+
+                    LambdaLogger.Log(
+                        $"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+                        $"Se descalendariza exitosamente el proceso.");
+
+                    return Results.Ok();
+                } catch (Exception ex) {
+                    LambdaLogger.Log(
+                        $"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+                        $"Ocurrió un error al descalendarizar el proceso. " +
                         $"{ex}");
                     return Results.Problem("Ocurrió un error al procesar su solicitud.");
                 }
