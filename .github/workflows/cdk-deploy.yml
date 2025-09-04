@@ -23,6 +23,11 @@ jobs:
             AOT_MINIMAL_API_LAMBDA_TIMEOUT: ${{ vars.AOT_MINIMAL_API_LAMBDA_TIMEOUT }}
             AOT_MINIMAL_API_MAPPING_DOMAIN_NAME: ${{ vars.AOT_MINIMAL_API_MAPPING_DOMAIN_NAME }}
             AOT_MINIMAL_API_MAPPING_KEY: ${{ vars.AOT_MINIMAL_API_MAPPING_KEY }}
+            
+            DISPATCHER_DIRECTORY: ${{ vars.DISPATCHER_DIRECTORY }}
+            DISPATCHER_LAMBDA_HANDLER: ${{ vars.DISPATCHER_LAMBDA_HANDLER }}
+            DISPATCHER_LAMBDA_MEMORY_SIZE: ${{ vars.DISPATCHER_LAMBDA_MEMORY_SIZE }}
+            DISPATCHER_LAMBDA_TIMEOUT: ${{ vars.DISPATCHER_LAMBDA_TIMEOUT }}
                                     
         steps:
             - name: Checkout Repositorio
@@ -48,6 +53,14 @@ jobs:
                     dotnet publish /p:PublishDir=../publish /p:PublishAot=true -r linux-x64 --self-contained &&
                     cd ./publish &&
                     zip -r -T ./publish.zip ./*"
+                    
+            - name: Publish .NET Lambda
+              working-directory: ${{ vars.DISPATCHER_DIRECTORY }}
+              run: dotnet publish /p:PublishDir=../publish /p:PublishReadyToRun=true -r linux-x64 --no-self-contained
+              
+            - name: Compress Publish Directory .NET Lambda
+              working-directory: ${{ vars.DISPATCHER_DIRECTORY }}/publish
+              run: zip -r -T ./publish.zip ./*
                     
             - name: Configure AWS Credentials
               uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
