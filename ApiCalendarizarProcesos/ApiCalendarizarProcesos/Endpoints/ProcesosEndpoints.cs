@@ -1,5 +1,6 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
 using Amazon.Scheduler;
 using ApiCalendarizarProcesos.Helpers;
@@ -52,29 +53,31 @@ namespace ApiCalendarizarProcesos.Endpoints {
                             }, AppJsonSerializerContext.Default.DispatcherInput)
                         );
                         if (scheduleExistente != null) {
-                            await dynamo.Crear(nombreTablaCalendarizaciones, new Document {
-                                ["IdCalendarizacion"] = scheduleExistente.Nombre,
-                                ["Nombre"] = scheduleExistente.Nombre,
-                                ["Descripcion"] = scheduleExistente.Descripcion,
-                                ["Grupo"] = scheduleExistente.Grupo,
-                                ["Cron"] = scheduleExistente.Cron,
-                                ["Arn"] = scheduleExistente.Arn,
-                                ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
+                            await dynamo.Insertar(nombreTablaCalendarizaciones, new Dictionary<string, AttributeValue> {
+                                ["IdCalendarizacion"] = new AttributeValue { S = scheduleExistente.Nombre } ,
+                                ["Nombre"] = new AttributeValue { S = scheduleExistente.Nombre },
+                                ["Descripcion"] = new AttributeValue { S = scheduleExistente.Descripcion },
+                                ["Grupo"] = new AttributeValue { S = scheduleExistente.Grupo },
+                                ["Cron"] = new AttributeValue { S = scheduleExistente.Cron },
+                                ["Arn"] = new AttributeValue { S = scheduleExistente.Arn },
+                                ["FechaCreacion"] = new AttributeValue { S = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture) },
                             });
                         }
                     }
 
                     // Se valida si ya existe el proceso en dynamoDB, si no existe entonces se registra...
                     string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Nombre)).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
-                    Document procesoExistente = await dynamo.Obtener(nombreTablaProcesos, entrada.Nombre);
-                    procesoExistente ??= await dynamo.Crear(nombreTablaProcesos, new Document {
-                        ["IdProceso"] = idProceso,
-                        ["IdCalendarizacion"] = idCalendarizacion,
-                        ["Nombre"] = entrada.Nombre,
-                        ["ArnProceso"] = entrada.ArnProceso,
-                        ["Parametros"] = dynamo.ToDynamoDbEntry(entrada.Parametros),
-                        ["Habilitado"] = entrada.Habilitado ? DynamoDBBool.True : DynamoDBBool.False,
-                        ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
+                    Dictionary<string, AttributeValue> procesoExistente = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, AttributeValue> {
+                        ["IdProceso"] = new AttributeValue { S = idProceso }
+                    });
+                    procesoExistente ??= await dynamo.Insertar(nombreTablaProcesos, new Dictionary<string, AttributeValue> {
+                        ["IdProceso"] = new AttributeValue { S = idProceso },
+                        ["IdCalendarizacion"] = new AttributeValue { S = idCalendarizacion },
+                        ["Nombre"] = new AttributeValue { S = entrada.Nombre },
+                        ["ArnProceso"] = new AttributeValue { S = entrada.ArnProceso },
+                        ["Parametros"] = new AttributeValue { S = entrada.Parametros },
+                        ["Habilitado"] = new AttributeValue { BOOL = entrada.Habilitado },
+                        ["FechaCreacion"] = new AttributeValue { S = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture) },
                     });
 
                     LambdaLogger.Log(

@@ -5,7 +5,7 @@ namespace ApiCalendarizarProcesos.Models {
         public required string Nombre { get; set; }
         public required string Cron { get; set; }
         public required string ArnProceso { get; set; }
-        public required JsonElement Parametros { get; set; }
+        public required string Parametros { get; set; }
         public required bool Habilitado { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
 using Amazon.SQS;
 using Amazon.SQS.Model;
@@ -26,31 +27,31 @@ public class Function(VariableEntornoHelper variableEntorno, ParameterStoreHelpe
         string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
         string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
 
-        List<Document> procesos = await dynamoHelper.ObtenerPorIndice(nombreTablaProcesos, "PorIdCalendarizacion", "IdCalendarizacion", input.IdCalendarizacion);
+        List<Dictionary<string, AttributeValue>> procesos = await dynamoHelper.ObtenerPorIndice(nombreTablaProcesos, "PorIdCalendarizacion", "IdCalendarizacion", input.IdCalendarizacion);
         
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
             $"Se tiene {procesos.Count} procesos por gatillar.");
 
-        foreach (Document proceso in procesos) {
+        foreach (Dictionary<string, AttributeValue> proceso in procesos) {
             try {
-                if (!proceso["Habilitado"].AsBoolean()) {
+                if (!proceso["Habilitado"].BOOL!.Value) {
                     LambdaLogger.Log(
                         $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                        $"No se despacha el proceso ID {proceso["IdProceso"].AsString()} dado que no está habilitado.");
+                        $"No se despacha el proceso ID {proceso["IdProceso"].S} dado que no está habilitado.");
                     continue;
                 }
 
                 SendMessageRequest request = new() {
                     QueueUrl = sqsQueueUrl,
-                    MessageBody = proceso.ToJson()
+                    MessageBody = DynamoHelper.ToJson(proceso)
                 };
 
                 SendMessageResponse response = await sqsClient.SendMessageAsync(request);
 
                 LambdaLogger.Log(
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                    $"Se despacha exitosamente el proceso ID {proceso["IdProceso"].AsString()}.");
+                    $"Se despacha exitosamente el proceso ID {proceso["IdProceso"].S}.");
 
             } catch(Exception ex) {
 

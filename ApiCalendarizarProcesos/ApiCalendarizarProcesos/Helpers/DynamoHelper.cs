@@ -1,81 +1,72 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Globalization;
 using System.Text.Json;
 
 namespace ApiCalendarizarProcesos.Helpers {
     public class DynamoHelper(IAmazonDynamoDB client) {
-        private readonly Dictionary<string, ITable> tablas = [];
 
-        private ITable ObtenerTabla(string nombreTabla) {
-            if (!tablas.TryGetValue(nombreTabla, out ITable? tabla)) {
-                tabla = Table.LoadTable(client, nombreTabla);
-                tablas.Add(nombreTabla, tabla);
+        public async Task<Dictionary<string, AttributeValue>> Insertar(string nombreTabla, Dictionary<string, AttributeValue> item) {
+            PutItemRequest request = new() {
+                TableName = nombreTabla,
+                Item = item
+            };
+
+            PutItemResponse response = await client.PutItemAsync(request);
+
+            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+                throw new Exception("Ocurrió un error al insertar el ítem de Dynamo");
             }
-            return tabla;
+
+            return item;
         }
 
-        public async Task<Document> Crear(string nombreTabla, Document elemento) {
-            ITable tabla = ObtenerTabla(nombreTabla);
-            return await tabla.PutItemAsync(elemento);
+        public async Task<Dictionary<string, AttributeValue>> Obtener(string nombreTabla, Dictionary<string, AttributeValue> key) {
+            GetItemRequest request = new() { 
+                TableName = nombreTabla,
+                Key = key
+            };
+
+            GetItemResponse response = await client.GetItemAsync(request);
+
+            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+                throw new Exception("Ocurrió un error al obtener el ítem de Dynamo");
+            }
+
+            return response.Item;
         }
 
-        public async Task<Document> Obtener(string nombreTabla, string key) {
-            ITable tabla = ObtenerTabla(nombreTabla);
-            return await tabla.GetItemAsync(key);
-        }
-
-        public async Task<List<Document>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
-            ITable tabla = ObtenerTabla(nombreTabla);
-
-            ISearch search = tabla.Query(new QueryOperationConfig {
+        public async Task<List<Dictionary<string, AttributeValue>>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
+            QueryRequest request = new() {
+                TableName = nombreTabla,
                 IndexName = nombreIndice,
-                Filter = new QueryFilter(nombreCampo, QueryOperator.Equal, valorCampo),
-                ConsistentRead = false
-            });
+                KeyConditionExpression = $"{nombreCampo} = :key",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+                    [":key"] = new AttributeValue { S = valorCampo }
+                }
+            };
 
-            return await search.GetRemainingAsync();
+            QueryResponse response = await client.QueryAsync(request);
+
+            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+                throw new Exception("Ocurrió un error al obtener por índice los ítems de Dynamo");
+            }
+
+            return response.Items;
         }
 
-        public async Task<Document> Eliminar(string nombreTabla, string key) {
-            ITable tabla = ObtenerTabla(nombreTabla);
-            return await tabla.DeleteItemAsync(key);
-        }
+        public async Task Eliminar(string nombreTabla, Dictionary<string, AttributeValue> key) {
+            DeleteItemRequest request = new() {
+                TableName = nombreTabla,
+                Key = key
+            };
 
-        public DynamoDBEntry ToDynamoDbEntry(JsonElement element) {
-            switch (element.ValueKind) {
-                case JsonValueKind.String:
-                    return new Primitive(element.GetString());
+            DeleteItemResponse response = await client.DeleteItemAsync(request);
 
-                case JsonValueKind.Number:
-                    if (element.TryGetInt64(out long l))
-                        return new Primitive(l.ToString(CultureInfo.InvariantCulture), true);
-                    if (element.TryGetDouble(out double d))
-                        return new Primitive(d.ToString(CultureInfo.InvariantCulture), true);
-                    return new Primitive(element.GetRawText());
-
-                case JsonValueKind.True:
-                case JsonValueKind.False:
-                    return new DynamoDBBool(element.GetBoolean());
-
-                case JsonValueKind.Array:
-                    DynamoDBList list = new();
-                    foreach (JsonElement item in element.EnumerateArray())
-                        list.Add(ToDynamoDbEntry(item));
-                    return list;
-
-                case JsonValueKind.Object:
-                    var doc = new Document();
-                    foreach (JsonProperty prop in element.EnumerateObject())
-                        doc[prop.Name] = ToDynamoDbEntry(prop.Value);
-                    return doc;
-
-                case JsonValueKind.Null:
-                case JsonValueKind.Undefined:
-                    return new DynamoDBNull();
-
-                default:
-                    throw new NotSupportedException($"Tipo de JsonElement no soportado: {element.ValueKind}");
+            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+                throw new Exception("Ocurrió un error al eliminar el ítem de Dynamo");
             }
         }
     }
