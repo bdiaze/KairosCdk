@@ -8,7 +8,7 @@ namespace ApiCalendarizarProcesos.Helpers {
     [JsonSerializable(typeof(APIGatewayProxyRequest))]
     [JsonSerializable(typeof(APIGatewayProxyResponse))]
     [JsonSerializable(typeof(ProblemDetails))]
-    [JsonSerializable(typeof(Todo[]))]
+    [JsonSerializable(typeof(EntIngresarProceso))]
     internal partial class AppJsonSerializerContext : JsonSerializerContext {
 
     }

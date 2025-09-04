@@ -125,10 +125,8 @@ namespace KairosCdk
                                     Sid = $"{appName}AccessToScheduler",
                                     Actions = [
                                         "scheduler:CreateSchedule",
-                                        "scheduler:UpdateSchedule",
                                         "scheduler:DeleteSchedule",
                                         "scheduler:GetSchedule",
-                                        "scheduler:ListSchedules"
                                     ],
                                     Resources = [
                                         $"arn:aws:scheduler:{this.Region}:{this.Account}:schedule/{scheduleGroup.Name}/*"
@@ -138,7 +136,6 @@ namespace KairosCdk
                                     Sid = $"{appName}AccessToDynamoDB",
                                     Actions = [
                                         "dynamodb:PutItem",
-                                        "dynamodb:UpdateItem",
                                         "dynamodb:DeleteItem",
                                         "dynamodb:GetItem",
                                         "dynamodb:Query"
