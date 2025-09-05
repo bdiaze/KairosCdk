@@ -14,12 +14,9 @@ using Amazon.StepFunctions.Model;
 using LambdaExecutor.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using System.Diagnostics;
-using System.Linq.Expressions;
 using System.Net;
-using System.Security.Principal;
-using System.Text.Json;
-using System.Xml.Linq;
 using static Amazon.Lambda.SQSEvents.SQSEvent;
 using LogLevel = Amazon.Lambda.Core.LogLevel;
 
@@ -70,7 +67,7 @@ public class Function
 
         foreach (SQSMessage mensaje in evnt.Records) {
             try { 
-                Dictionary<string, object?> proceso = JsonSerializer.Deserialize<Dictionary<string, object?>>(mensaje.Body)!;
+                Dictionary<string, object?> proceso = JsonConvert.DeserializeObject<Dictionary<string, object?>>(mensaje.Body)!;
 
                 LambdaLogger.Log(
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
@@ -85,7 +82,7 @@ public class Function
 
                         continue;
                     }
-                    
+
                     // Se asume el rol para ejecutar el proceso...
                     AssumeRoleRequest requestAssumeRole = new() {
                         RoleSessionName = $"{nombreAplicacion}-Execute-Session",
