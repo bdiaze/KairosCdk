@@ -54,20 +54,28 @@ public class Function
         DynamoHelper dynamoHelper = serviceProvider.GetRequiredService<DynamoHelper>();
         IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
 
+        LambdaLogger.Log(
+            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
+            $"Se obtendran los parametros necesarios para despachar los procesos.");
+
         string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
         string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
         string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
+
+        LambdaLogger.Log(
+            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
+            $"Se consultaran los procesos que necesitan ser despachados.");
 
         List<Dictionary<string, object?>> procesos = await dynamoHelper.ObtenerPorIndice(nombreTablaProcesos, "PorIdCalendarizacion", "IdCalendarizacion", input.IdCalendarizacion);
         
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-            $"Se tiene {procesos.Count} procesos por gatillar.");
+            $"Se tiene {procesos.Count} procesos para despachar.");
 
         foreach (Dictionary<string, object?> proceso in procesos) {
             try {
                 if (!proceso.ContainsKey("Habilitado") || proceso["Habilitado"] == null || !(bool)proceso["Habilitado"]!) {
-                    LambdaLogger.Log(
+                    LambdaLogger.Log(LogLevel.Warning,
                         $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
                         $"No se despacha el proceso ID {proceso["IdProceso"]} dado que no esta habilitado.");
                     continue;
@@ -86,12 +94,16 @@ public class Function
 
             } catch(Exception ex) {
 
-                LambdaLogger.Log(
+                LambdaLogger.Log(LogLevel.Error,
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
                     $"Ocurrio un error al despachar proceso - ID: {proceso["IdProceso"]}. " +
                     $"{ex}");
 
             }
         }
+
+        LambdaLogger.Log(
+            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
+            $"Termino exitosamente el dispatcher de procesos.");
     }
 }
