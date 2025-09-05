@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ApiCalendarizarProcesos.Helpers {
     public class SchedulerHelper(IAmazonScheduler client) {
-        public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string cron, string roleArn, string targetArn, string targetInput) {
+        public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string cron, string roleArn, string dlqArn, string targetArn, string targetInput) {
             CreateScheduleRequest request = new() {
                 Name = nombre,
                 Description = descripcion,
@@ -18,8 +18,17 @@ namespace ApiCalendarizarProcesos.Helpers {
                 Target = new Target {
                     Arn = targetArn,
                     RoleArn = roleArn,
-                    Input = targetInput
-                }
+                    Input = targetInput,
+                    DeadLetterConfig = new DeadLetterConfig {
+                        Arn = dlqArn,
+                    },
+                    RetryPolicy = new RetryPolicy {
+                        MaximumRetryAttempts = 5,
+                        MaximumEventAgeInSeconds = 60 * 60,
+                    },
+                },
+                ScheduleExpressionTimezone = "America/Santiago",
+
             };
 
             CreateScheduleResponse response = await client.CreateScheduleAsync(request);

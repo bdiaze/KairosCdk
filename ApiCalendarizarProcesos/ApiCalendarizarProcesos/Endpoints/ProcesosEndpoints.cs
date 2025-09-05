@@ -32,6 +32,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
                     string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/NombreGrupo");
                     string arnRoleSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/RoleArn");
+                    string arnDlqSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/DeadLetterQueueArn");
                     string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
 
                     // Se limpia la entrada...
@@ -48,6 +49,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                             nombreScheduleGroup, 
                             entrada.Cron,
                             arnRoleSchedule,
+                            arnDlqSchedule,
                             arnLambdaDispatcher,
                             JsonSerializer.Serialize(new DispatcherInput { 
                                 IdCalendarizacion = idCalendarizacion

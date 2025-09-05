@@ -317,7 +317,46 @@ namespace KairosCdk
             }));
             #endregion
 
-            #region Role para Scheduler
+            #region DLQ y Role para Scheduler
+            // Creación de cola...
+            Queue schedulerDlq = new(this, $"{appName}ScheduleDeadLetterQueue", new QueueProps {
+                QueueName = $"{appName}ScheduleDeadLetterQueue",
+                RetentionPeriod = Duration.Days(14),
+                EnforceSSL = true,
+            });
+
+            StringParameter stringParameterScheduleDlq = new(this, $"{appName}StringParameterScheduleDlq", new StringParameterProps {
+                ParameterName = $"/{appName}/Schedule/DeadLetterQueueArn",
+                Description = $"ARN del Dead Letter Queue para Schedule de la aplicacion {appName}",
+                StringValue = schedulerDlq.QueueArn,
+                Tier = ParameterTier.STANDARD,
+            });
+
+            // Se crea SNS topic para notificaciones asociadas a la instancia...
+            Topic topicScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueSNSTopic", new TopicProps {
+                TopicName = $"{appName}ScheduleDeadLetterQueueSNSTopic",
+            });
+
+            foreach (string email in notificationEmails.Split(",")) {
+                topicScheduleDlq.AddSubscription(new EmailSubscription(email));
+            }
+
+            // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+            Alarm alarmScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueAlarm", new AlarmProps {
+                AlarmName = $"{appName}ScheduleDeadLetterQueueAlarm",
+                AlarmDescription = $"Alarma para notificar cuando llega algun elemento al Schedule DLQ de {appName}",
+                Metric = schedulerDlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+                    Period = Duration.Minutes(5),
+                    Statistic = Stats.MAXIMUM,
+                }),
+                Threshold = 1,
+                EvaluationPeriods = 1,
+                DatapointsToAlarm = 1,
+                ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                TreatMissingData = TreatMissingData.NOT_BREACHING,
+            });
+            alarmScheduleDlq.AddAlarmAction(new SnsAction(topicScheduleDlq));
+
             // Creación de role usado por Scheduler para gatillar dispatcher lambda...
             Role roleScheduler = new(this, $"{appName}SchedulerRole", new RoleProps {
                 RoleName = $"{appName}SchedulerRole",
@@ -335,6 +374,15 @@ namespace KairosCdk
                                     ],
                                     Resources = [
                                         dispatcherFunction.FunctionArn
+                                    ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToSQS",
+                                    Actions = [
+                                        "sqs:SendMessage"
+                                    ],
+                                    Resources = [
+                                        schedulerDlq.QueueArn
                                     ],
                                 })
                             ]
@@ -383,6 +431,7 @@ namespace KairosCdk
                                         stringParameterRoleScheduler.ParameterArn,
                                         stringParameterDispatcherFunction.ParameterArn,
                                         stringParameterScheduleGroup.ParameterArn,
+                                        stringParameterScheduleDlq.ParameterArn,
                                     ],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
