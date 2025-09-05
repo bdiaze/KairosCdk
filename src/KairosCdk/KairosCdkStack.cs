@@ -307,7 +307,6 @@ namespace KairosCdk
                     { "APP_NAME", appName },
                 },
                 Role = roleExecutorLambda,
-                ReservedConcurrentExecutions = 1
             });
 
             executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
