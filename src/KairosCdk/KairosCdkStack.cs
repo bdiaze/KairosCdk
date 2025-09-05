@@ -179,7 +179,7 @@ namespace KairosCdk
             // Creación de la función lambda...
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}DispatcherLambdaFunction",
-                Description = $"Función dispatcher encargada de ingresar los procesos a la cola de ejecución de la aplicacion {appName}",
+                Description = $"Funcion dispatcher encargada de ingresar los procesos a la cola de ejecucion de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = dispatcherHandler,
                 Code = Code.FromAsset($"{dispatcherDirectory}/publish/publish.zip"),
@@ -265,7 +265,7 @@ namespace KairosCdk
 
             _ = new StringParameter(this, $"{appName}StringParameterPrefixRoles", new StringParameterProps {
                 ParameterName = $"/{appName}/Executor/PrefixRoles",
-                Description = $"Prefijo que deben tener los roles de ejecución de la aplicacion {appName}",
+                Description = $"Prefijo que deben tener los roles de ejecucion de la aplicacion {appName}",
                 StringValue = executorPrefixRoles,
                 Tier = ParameterTier.STANDARD,
             });
@@ -273,7 +273,7 @@ namespace KairosCdk
             // Creación de la función lambda...
             Function executorFunction = new(this, $"{appName}ExecutorLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}ExecutorLambdaFunction",
-                Description = $"Función executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
+                Description = $"Funcion executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = executorHandler,
                 Code = Code.FromAsset($"{executorDirectory}/publish/publish.zip"),
@@ -285,6 +285,7 @@ namespace KairosCdk
                     { "APP_NAME", appName },
                 },
                 Role = roleExecutorLambda,
+                ReservedConcurrentExecutions = 1
             });
 
             executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
@@ -406,7 +407,7 @@ namespace KairosCdk
             // Creación de la función lambda...
             Function function = new(this, $"{appName}APILambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}APILambdaFunction",
-                Description = $"API encargada de programar la ejecución de procesos de la aplicacion {appName}",
+                Description = $"API encargada de programar la ejecucion de procesos de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = apiHandler,
                 Code = Code.FromAsset($"{apiDirectory}/publish/publish.zip"),
