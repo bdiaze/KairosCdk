@@ -1,5 +1,3 @@
-using Amazon.EventBridge;
-using Amazon.EventBridge.Model;
 using Amazon.Lambda;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.Model;
