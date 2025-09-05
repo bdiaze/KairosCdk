@@ -4,6 +4,7 @@ using Amazon.CDK.AWS.Apigatewayv2;
 using Amazon.CDK.AWS.DynamoDB;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
+using Amazon.CDK.AWS.Lambda.EventSources;
 using Amazon.CDK.AWS.Logs;
 using Amazon.CDK.AWS.Scheduler;
 using Amazon.CDK.AWS.SQS;
@@ -23,6 +24,24 @@ namespace KairosCdk
             string appName = System.Environment.GetEnvironmentVariable("APP_NAME") ?? throw new ArgumentNullException("APP_NAME");
             string account = System.Environment.GetEnvironmentVariable("ACCOUNT_AWS") ?? throw new ArgumentNullException("ACCOUNT_AWS");
             string region = System.Environment.GetEnvironmentVariable("REGION_AWS") ?? throw new ArgumentNullException("REGION_AWS");
+
+            string dispatcherDirectory = System.Environment.GetEnvironmentVariable("DISPATCHER_DIRECTORY") ?? throw new ArgumentNullException("DISPATCHER_DIRECTORY");
+            string dispatcherHandler = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_HANDLER") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_HANDLER");
+            string dispatcherTimeout = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_TIMEOUT");
+            string dispatcherMemorySize = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_MEMORY_SIZE");
+
+            string executorDirectory = System.Environment.GetEnvironmentVariable("EXECUTOR_DIRECTORY") ?? throw new ArgumentNullException("EXECUTOR_DIRECTORY");
+            string executorHandler = System.Environment.GetEnvironmentVariable("EXECUTOR_LAMBDA_HANDLER") ?? throw new ArgumentNullException("EXECUTOR_LAMBDA_HANDLER");
+            string executorTimeout = System.Environment.GetEnvironmentVariable("EXECUTOR_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("EXECUTOR_LAMBDA_TIMEOUT");
+            string executorMemorySize = System.Environment.GetEnvironmentVariable("EXECUTOR_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("EXECUTOR_LAMBDA_MEMORY_SIZE");
+            string executorPrefixRoles = System.Environment.GetEnvironmentVariable("EXECUTOR_LAMBDA_PREFIX_ROLES") ?? throw new ArgumentNullException("EXECUTOR_LAMBDA_PREFIX_ROLES");
+
+            string apiDirectory = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_DIRECTORY") ?? throw new ArgumentNullException("AOT_MINIMAL_API_DIRECTORY");
+            string apiHandler = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_HANDLER") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_HANDLER");
+            string apiTimeout = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_TIMEOUT");
+            string apiMemorySize = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE");
+            string apiDomainName = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME");
+            string apiMappingKey = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_KEY") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_KEY");
 
             #region DynamoDB
             // Se crean tablas para registrar los procesos y calendarizaciones...
@@ -84,17 +103,12 @@ namespace KairosCdk
             });
             #endregion
 
-            #region SQS y Lambda
-            string dispatcherDirectory = System.Environment.GetEnvironmentVariable("DISPATCHER_DIRECTORY") ?? throw new ArgumentNullException("DISPATCHER_DIRECTORY");
-            string dispatcherHandler = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_HANDLER") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_HANDLER");
-            string dispatcherTimeout = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_TIMEOUT");
-            string dispatcherMemorySize = System.Environment.GetEnvironmentVariable("DISPATCHER_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("DISPATCHER_LAMBDA_MEMORY_SIZE");
-
+            #region SQS
             // Creación de cola...
             Queue queue = new(this, $"{appName}Queue", new QueueProps {
                 QueueName = $"{appName}Queue",
                 RetentionPeriod = Duration.Days(14),
-                VisibilityTimeout = Duration.Minutes(5),
+                VisibilityTimeout = Duration.Seconds(double.Parse(executorTimeout)),
                 EnforceSSL = true,
             });
 
@@ -104,7 +118,9 @@ namespace KairosCdk
                 StringValue = queue.QueueUrl,
                 Tier = ParameterTier.STANDARD,
             });
+            #endregion
 
+            #region Lambda Dispatcher
             // Creación de log group lambda...
             LogGroup dispatcherLogGroup = new(this, $"{appName}DispatcherLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}DispatcherLambdaFunction/logs",
@@ -185,6 +201,98 @@ namespace KairosCdk
             });
             #endregion
 
+            #region Lambda Executor
+            // Creación de log group lambda...
+            LogGroup executorLogGroup = new(this, $"{appName}ExecutorLogGroup", new LogGroupProps {
+                LogGroupName = $"/aws/lambda/{appName}ExecutorLambdaFunction/logs",
+                RemovalPolicy = RemovalPolicy.DESTROY
+            });
+
+            // Creación de role para la función lambda...
+            Role roleExecutorLambda = new(this, $"{appName}ExecutorLambdaRole", new RoleProps {
+                RoleName = $"{appName}ExecutorLambdaRole",
+                Description = $"Role para Lambda executor de {appName}",
+                AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
+                ManagedPolicies = [
+                    ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole"),
+                    ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+                ],
+                InlinePolicies = new Dictionary<string, PolicyDocument> {
+                    {
+                        $"{appName}ExecutorLambdaPolicy",
+                        new PolicyDocument(new PolicyDocumentProps {
+                            Statements = [
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToParameterStore",
+                                    Actions = [
+                                        "ssm:GetParameter"
+                                    ],
+                                    Resources = [
+                                        stringParameterQueueUrl.ParameterArn,
+                                    ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToSQS",
+                                    Actions = [
+                                        "sqs:ReceiveMessage",
+                                        "sqs:DeleteMessage",
+                                    ],
+                                    Resources = [
+                                        queue.QueueArn
+                                    ],
+                                }),
+                                new PolicyStatement(new PolicyStatementProps{
+                                    Sid = $"{appName}AccessToRoles",
+                                    Actions = [
+                                        "sts:AssumeRole",
+                                    ],
+                                    Resources = [
+                                        $"arn:aws:iam::{this.Account}:role/{executorPrefixRoles}*"
+                                    ],
+                                }),
+                            ]
+                        })
+                    }
+                }
+            });
+
+            _ = new StringParameter(this, $"{appName}StringParameterExecutorFunction", new StringParameterProps {
+                ParameterName = $"/{appName}/Executor/RoleArn",
+                Description = $"ARN del Rol para Lambda executor de la aplicacion {appName}",
+                StringValue = roleExecutorLambda.RoleArn,
+                Tier = ParameterTier.STANDARD,
+            });
+
+            _ = new StringParameter(this, $"{appName}StringParameterPrefixRoles", new StringParameterProps {
+                ParameterName = $"/{appName}/Executor/PrefixRoles",
+                Description = $"Prefijo que deben tener los roles de ejecución de la aplicacion {appName}",
+                StringValue = executorPrefixRoles,
+                Tier = ParameterTier.STANDARD,
+            });
+
+            // Creación de la función lambda...
+            Function executorFunction = new(this, $"{appName}ExecutorLambdaFunction", new FunctionProps {
+                FunctionName = $"{appName}ExecutorLambdaFunction",
+                Description = $"Función executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
+                Runtime = Runtime.DOTNET_8,
+                Handler = executorHandler,
+                Code = Code.FromAsset($"{executorDirectory}/publish/publish.zip"),
+                Timeout = Duration.Seconds(double.Parse(executorTimeout)),
+                MemorySize = double.Parse(executorMemorySize),
+                Architecture = Architecture.X86_64,
+                LogGroup = executorLogGroup,
+                Environment = new Dictionary<string, string> {
+                    { "APP_NAME", appName },
+                },
+                Role = roleExecutorLambda,
+            });
+
+            executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
+                Enabled = true,
+                BatchSize = 1
+            }));
+            #endregion
+
             #region Role para Scheduler
             // Creación de role usado por Scheduler para gatillar dispatcher lambda...
             Role roleScheduler = new(this, $"{appName}SchedulerRole", new RoleProps {
@@ -220,13 +328,6 @@ namespace KairosCdk
             #endregion
 
             #region API Gateway y Lambda
-            string apiDirectory = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_DIRECTORY") ?? throw new ArgumentNullException("AOT_MINIMAL_API_DIRECTORY");
-            string apiHandler = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_HANDLER") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_HANDLER");
-            string apiTimeout = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_TIMEOUT") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_TIMEOUT");
-            string apiMemorySize = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE");
-            string apiDomainName = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME");
-            string apiMappingKey = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_KEY") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_KEY");
-
             // Creación de log group lambda...
             LogGroup logGroup = new(this, $"{appName}APILogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}APILambdaFunction/logs",
@@ -234,7 +335,7 @@ namespace KairosCdk
             });
 
             // Creación de role para la función lambda...
-            IRole roleLambda = new Role(this, $"{appName}APILambdaRole", new RoleProps {
+            Role roleLambda = new(this, $"{appName}APILambdaRole", new RoleProps {
                 RoleName = $"{appName}APILambdaRole",
                 Description = $"Role para API Lambda de {appName}",
                 AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),

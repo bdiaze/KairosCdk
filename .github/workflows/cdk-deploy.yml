@@ -28,6 +28,12 @@ jobs:
             DISPATCHER_LAMBDA_HANDLER: ${{ vars.DISPATCHER_LAMBDA_HANDLER }}
             DISPATCHER_LAMBDA_MEMORY_SIZE: ${{ vars.DISPATCHER_LAMBDA_MEMORY_SIZE }}
             DISPATCHER_LAMBDA_TIMEOUT: ${{ vars.DISPATCHER_LAMBDA_TIMEOUT }}
+            
+            EXECUTOR_DIRECTORY: ${{ vars.EXECUTOR_DIRECTORY }}
+            EXECUTOR_LAMBDA_HANDLER: ${{ vars.EXECUTOR_LAMBDA_HANDLER }}
+            EXECUTOR_LAMBDA_MEMORY_SIZE: ${{ vars.EXECUTOR_LAMBDA_MEMORY_SIZE }}
+            EXECUTOR_LAMBDA_TIMEOUT: ${{ vars.EXECUTOR_LAMBDA_TIMEOUT }}
+            EXECUTOR_LAMBDA_PREFIX_ROLES: ${{ vars.EXECUTOR_LAMBDA_PREFIX_ROLES }}
                                     
         steps:
             - name: Checkout Repositorio
@@ -60,6 +66,14 @@ jobs:
               
             - name: Compress Publish Directory .NET Lambda
               working-directory: ${{ vars.DISPATCHER_DIRECTORY }}/publish
+              run: zip -r -T ./publish.zip ./*
+              
+            - name: Publish .NET Lambda
+              working-directory: ${{ vars.EXECUTOR_DIRECTORY }}
+              run: dotnet publish /p:PublishDir=../publish /p:PublishReadyToRun=true -r linux-x64 --no-self-contained
+              
+            - name: Compress Publish Directory .NET Lambda
+              working-directory: ${{ vars.EXECUTOR_DIRECTORY }}/publish
               run: zip -r -T ./publish.zip ./*
                     
             - name: Configure AWS Credentials
