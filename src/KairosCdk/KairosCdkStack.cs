@@ -1,12 +1,16 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.APIGateway;
 using Amazon.CDK.AWS.Apigatewayv2;
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.CloudWatch.Actions;
 using Amazon.CDK.AWS.DynamoDB;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Lambda.EventSources;
 using Amazon.CDK.AWS.Logs;
 using Amazon.CDK.AWS.Scheduler;
+using Amazon.CDK.AWS.SNS;
+using Amazon.CDK.AWS.SNS.Subscriptions;
 using Amazon.CDK.AWS.SQS;
 using Amazon.CDK.AWS.SSM;
 using Constructs;
@@ -42,6 +46,8 @@ namespace KairosCdk
             string apiMemorySize = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE") ?? throw new ArgumentNullException("AOT_MINIMAL_API_LAMBDA_MEMORY_SIZE");
             string apiDomainName = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_DOMAIN_NAME");
             string apiMappingKey = System.Environment.GetEnvironmentVariable("AOT_MINIMAL_API_MAPPING_KEY") ?? throw new ArgumentNullException("AOT_MINIMAL_API_MAPPING_KEY");
+
+            string notificationEmails = System.Environment.GetEnvironmentVariable("NOTIFICATION_EMAILS") ?? throw new ArgumentNullException("NOTIFICATION_EMAILS");
 
             #region DynamoDB
             // Se crean tablas para registrar los procesos y calendarizaciones...
@@ -105,12 +111,47 @@ namespace KairosCdk
 
             #region SQS
             // Creación de cola...
+            Queue dlq = new(this, $"{appName}DeadLetterQueue", new QueueProps {
+                QueueName = $"{appName}DeadLetterQueue",
+                RetentionPeriod = Duration.Days(14),
+                EnforceSSL = true,
+            });
+
             Queue queue = new(this, $"{appName}Queue", new QueueProps {
                 QueueName = $"{appName}Queue",
                 RetentionPeriod = Duration.Days(14),
-                VisibilityTimeout = Duration.Seconds(double.Parse(executorTimeout)),
+                VisibilityTimeout = Duration.Seconds(Math.Round(double.Parse(executorTimeout) * 1.5)),
                 EnforceSSL = true,
+                DeadLetterQueue = new DeadLetterQueue {
+                    Queue = dlq,
+                    MaxReceiveCount = 3,
+                },
             });
+
+            // Se crea SNS topic para notificaciones asociadas a la instancia...
+            Topic topic = new(this, $"{appName}DeadLetterQueueSNSTopic", new TopicProps {
+                TopicName = $"{appName}DeadLetterQueueSNSTopic",
+            });
+
+            foreach (string email in notificationEmails.Split(",")) {
+                topic.AddSubscription(new EmailSubscription(email));
+            }
+
+            // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+            Alarm alarm = new(this, $"{appName}DeadLetterQueueAlarm", new AlarmProps {
+                AlarmName = $"{appName}DeadLetterQueueAlarm",
+                AlarmDescription = $"Alarma para notificar cuando llega algun elemento a la DLQ de {appName}",
+                Metric = dlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+                    Period = Duration.Minutes(5),
+                    Statistic = Stats.MAXIMUM,
+                }),
+                Threshold = 1,
+                EvaluationPeriods = 1,
+                DatapointsToAlarm = 1,
+                ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                TreatMissingData = TreatMissingData.NOT_BREACHING,
+            });
+            alarm.AddAlarmAction(new SnsAction(topic));
 
             StringParameter stringParameterQueueUrl = new(this, $"{appName}StringParameterQueueUrl", new StringParameterProps {
                 ParameterName = $"/{appName}/SQS/QueueUrl",
@@ -223,25 +264,6 @@ namespace KairosCdk
                         new PolicyDocument(new PolicyDocumentProps {
                             Statements = [
                                 new PolicyStatement(new PolicyStatementProps{
-                                    Sid = $"{appName}AccessToParameterStore",
-                                    Actions = [
-                                        "ssm:GetParameter"
-                                    ],
-                                    Resources = [
-                                        stringParameterQueueUrl.ParameterArn,
-                                    ],
-                                }),
-                                new PolicyStatement(new PolicyStatementProps{
-                                    Sid = $"{appName}AccessToSQS",
-                                    Actions = [
-                                        "sqs:ReceiveMessage",
-                                        "sqs:DeleteMessage",
-                                    ],
-                                    Resources = [
-                                        queue.QueueArn
-                                    ],
-                                }),
-                                new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToRoles",
                                     Actions = [
                                         "sts:AssumeRole",
@@ -290,8 +312,9 @@ namespace KairosCdk
 
             executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
                 Enabled = true,
-                BatchSize = 1000,
-                MaxBatchingWindow = Duration.Seconds(30)
+                BatchSize = Math.Round(double.Parse(executorTimeout) * 5 * 0.5),
+                MaxBatchingWindow = Duration.Seconds(30),
+                ReportBatchItemFailures = true,
             }));
             #endregion
 

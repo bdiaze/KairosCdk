@@ -17,6 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Net;
+using static Amazon.Lambda.SQSEvents.SQSBatchResponse;
 using static Amazon.Lambda.SQSEvents.SQSEvent;
 using LogLevel = Amazon.Lambda.Core.LogLevel;
 
@@ -34,7 +35,6 @@ public class Function
         builder.ConfigureServices((context, services) => {
             #region Singleton AWS Services
             services.AddSingleton<IAmazonSimpleSystemsManagement, AmazonSimpleSystemsManagementClient>();
-            services.AddSingleton<IAmazonSQS, AmazonSQSClient>();
             services.AddSingleton<IAmazonSecurityTokenService, AmazonSecurityTokenServiceClient>();
             #endregion
 
@@ -49,8 +49,10 @@ public class Function
         serviceProvider = app.Services;
     }
 
-    public async Task FunctionHandler(SQSEvent evnt, ILambdaContext context)
+    public async Task<SQSBatchResponse> FunctionHandler(SQSEvent evnt, ILambdaContext context)
     {
+        List<BatchItemFailure> listaMensajesError = [];
+
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         LambdaLogger.Log(
@@ -59,7 +61,6 @@ public class Function
 
         VariableEntornoHelper variableEntorno = serviceProvider.GetRequiredService<VariableEntornoHelper>();
         ParameterStoreHelper parameterStore = serviceProvider.GetRequiredService<ParameterStoreHelper>();
-        IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
         IAmazonSecurityTokenService securityTokenClient = serviceProvider.GetRequiredService<IAmazonSecurityTokenService>();
 
         LambdaLogger.Log(
@@ -67,7 +68,6 @@ public class Function
             $"Se obtendran los parametros necesarios para procesar los mensajes.");
 
         string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-        string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
@@ -84,11 +84,7 @@ public class Function
                 if (proceso.TryGetValue("ArnRol", out object? arnRole) && proceso.TryGetValue("ArnProceso", out object? arnProceso) && proceso.TryGetValue("Parametros", out object? parametros)) {
                     // Si no viene el ARN del role o del proceso a gatillar, se omite la ejecución...
                     if (arnRole == null || arnProceso == null) {
-                        LambdaLogger.Log(LogLevel.Warning,
-                            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se omite procesar el mensaje dado que no incluye ARN del proceso o ARN del role - Message ID: {mensaje.MessageId}.");
-
-                        continue;
+                        throw new Exception("El atributo ArnRol o ArnProceso no puede ser nulo.");
                     }
 
                     // Se asume el rol para ejecutar el proceso...
@@ -173,23 +169,27 @@ public class Function
                     } else {
                         throw new NotSupportedException($"{nombreAplicacion} no soporta el ARN ingresado: {(string)arnProceso}");
                     }
-
-                    // Se elimina mensaje de la cola...
-                    DeleteMessageResponse deleteResponse = await sqsClient.DeleteMessageAsync(sqsQueueUrl, mensaje.ReceiptHandle);
-                    if (deleteResponse.HttpStatusCode != HttpStatusCode.OK) {
-                        throw new Exception($"Error al quitar mensaje de la cola [DeleteMessageResponse - Message ID: {mensaje.MessageId} - HttpStatusCode: {deleteResponse.HttpStatusCode}]");
-                    }
+                } else {
+                    throw new Exception("El mensaje no incluye el atributo ArnRol, ArnProceso o Parametros.");
                 }
             } catch(Exception ex) {
                 LambdaLogger.Log(LogLevel.Error,
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
                     $"Ocurrio un error al procesar mensaje - Message ID: {mensaje.MessageId}. " +
                     $"{ex}");
+
+                listaMensajesError.Add(new BatchItemFailure {
+                    ItemIdentifier = mensaje.MessageId,
+                });
             }
         }
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-            $"Termino exitosamente el executor de procesos.");
+            $"Termino exitosamente el executor de procesos - Casos con error: {listaMensajesError.Count}.");
+
+        return new SQSBatchResponse {
+            BatchItemFailures = listaMensajesError
+        };
     }
 }
