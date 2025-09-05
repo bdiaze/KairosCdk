@@ -69,7 +69,7 @@ public class Function
                 if (!proceso.ContainsKey("Habilitado") || proceso["Habilitado"] == null || !(bool)proceso["Habilitado"]!) {
                     LambdaLogger.Log(
                         $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                        $"No se despacha el proceso ID {proceso["IdProceso"]} dado que no está habilitado.");
+                        $"No se despacha el proceso ID {proceso["IdProceso"]} dado que no esta habilitado.");
                     continue;
                 }
 

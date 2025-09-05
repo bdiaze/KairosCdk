@@ -90,7 +90,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                 } catch (Exception ex) {
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
-                        $"Ocurrió un error al programar el proceso. " +
+                        $"Ocurrio un error al programar el proceso. " +
                         $"{ex}");
                     return Results.Problem("Ocurrió un error al procesar su solicitud.");
                 }
@@ -161,7 +161,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                 } catch (Exception ex) {
                     LambdaLogger.Log(
                         $"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
-                        $"Ocurrió un error al descalendarizar el proceso. " +
+                        $"Ocurrio un error al descalendarizar el proceso. " +
                         $"{ex}");
                     return Results.Problem("Ocurrió un error al procesar su solicitud.");
                 }

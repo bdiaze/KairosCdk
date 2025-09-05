@@ -74,7 +74,7 @@ public class Function
 
                 LambdaLogger.Log(
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                    $"Se procederá a procesar el mensaje de la cola - Message ID: {mensaje.MessageId}");
+                    $"Se procedera a procesar el mensaje de la cola - Message ID: {mensaje.MessageId}");
 
                 if (proceso.TryGetValue("ArnRol", out object? arnRole) && proceso.TryGetValue("ArnProceso", out object? arnProceso) && proceso.TryGetValue("Parametros", out object? parametros)) {
                     // Si no viene el ARN del role o del proceso a gatillar, se omite la ejecución...
@@ -111,7 +111,7 @@ public class Function
 
                         LambdaLogger.Log(
                             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se procesa exitosamente la llamada a la función lambda ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
+                            $"Se procesa exitosamente la llamada a la funcion lambda ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
                     } else if (((string)arnProceso).StartsWith("arn:aws:states:")) {    
                         AmazonStepFunctionsClient stepFunctionClient = new(
                             responseAssumeRole.Credentials.AccessKeyId,
@@ -185,6 +185,6 @@ public class Function
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-            $"Terminó exitosamente el executor de procesos.");
+            $"Termino exitosamente el executor de procesos.");
     }
 }
