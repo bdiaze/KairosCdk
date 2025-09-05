@@ -62,6 +62,10 @@ public class Function
         IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
         IAmazonSecurityTokenService securityTokenClient = serviceProvider.GetRequiredService<IAmazonSecurityTokenService>();
 
+        LambdaLogger.Log(
+            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
+            $"Se obtendran los parametros necesarios para procesar los mensajes.");
+
         string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
         string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
 

@@ -289,7 +289,8 @@ namespace KairosCdk
 
             executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
                 Enabled = true,
-                BatchSize = 1
+                BatchSize = 1000,
+                MaxBatchingWindow = Duration.Seconds(30)
             }));
             #endregion
 
