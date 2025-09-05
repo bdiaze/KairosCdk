@@ -69,13 +69,17 @@ public class Function
         string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
         string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
 
+        LambdaLogger.Log(
+            $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
+            $"Se tiene {evnt.Records.Count} mensajes que procesar.");
+
         foreach (SQSMessage mensaje in evnt.Records) {
             try { 
                 Dictionary<string, object?> proceso = JsonConvert.DeserializeObject<Dictionary<string, object?>>(mensaje.Body)!;
 
                 LambdaLogger.Log(
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                    $"Se procedera a procesar el mensaje de la cola - Message ID: {mensaje.MessageId}");
+                    $"Se procedera a procesar el mensaje de la cola - Message ID: {mensaje.MessageId}.");
 
                 if (proceso.TryGetValue("ArnRol", out object? arnRole) && proceso.TryGetValue("ArnProceso", out object? arnProceso) && proceso.TryGetValue("Parametros", out object? parametros)) {
                     // Si no viene el ARN del role o del proceso a gatillar, se omite la ejecución...
@@ -112,7 +116,7 @@ public class Function
 
                         LambdaLogger.Log(
                             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se procesa exitosamente la llamada a la funcion lambda ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
+                            $"Se procesa exitosamente la llamada a la funcion lambda ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}.");
                     } else if (((string)arnProceso).StartsWith("arn:aws:states:")) {    
                         AmazonStepFunctionsClient stepFunctionClient = new(
                             responseAssumeRole.Credentials.AccessKeyId,
@@ -129,7 +133,7 @@ public class Function
 
                         LambdaLogger.Log(
                             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se procesa exitosamente la llamada a la step function ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
+                            $"Se procesa exitosamente la llamada a la step function ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}.");
                     } else if (((string)arnProceso).StartsWith("arn:aws:sns:")) {
                         AmazonSimpleNotificationServiceClient snsClient = new(
                             responseAssumeRole.Credentials.AccessKeyId,
@@ -146,7 +150,7 @@ public class Function
 
                         LambdaLogger.Log(
                             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se procesa exitosamente la llamada a SNS ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
+                            $"Se procesa exitosamente la llamada a SNS ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}.");
                     } else if (((string)arnProceso).StartsWith("arn:aws:sqs:")) {
                         AmazonSQSClient sqsAssumeClient = new(
                             responseAssumeRole.Credentials.AccessKeyId,
@@ -165,7 +169,7 @@ public class Function
 
                         LambdaLogger.Log(
                             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                            $"Se procesa exitosamente la llamada a SQS ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}");
+                            $"Se procesa exitosamente la llamada a SQS ARN {(string)arnProceso} - Message ID: {mensaje.MessageId}.");
                     } else {
                         throw new NotSupportedException($"{nombreAplicacion} no soporta el ARN ingresado: {(string)arnProceso}");
                     }
