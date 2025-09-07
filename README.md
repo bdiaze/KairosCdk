@@ -9,13 +9,15 @@
     - [Modelo de Datos](#modelo-de-datos)
       - [DynamoDB Tables y Global Secondary Index](#dynamodb-tables-y-global-secondary-index)
       - [Systems Manager String Parameter](#systems-manager-string-parameter)
+    - [Sistema de Notificaciones](#sistema-de-notificaciones)
+      - [SNS Topic y Subscriptions](#sns-topic-y-subscriptions)
     - [Sistema de Colas](#sistema-de-colas)
       - [SQS Queue y Dead Letter Queue](#sqs-queue-y-dead-letter-queue)
-      - [SNS Topic y CloudWatch Alarm](#sns-topic-y-cloudwatch-alarm)
+      - [CloudWatch Alarm](#cloudwatch-alarm)
       - [Systems Manager String Parameter](#systems-manager-string-parameter-1)
     - [Lambda Dispatcher](#lambda-dispatcher)
       - [Log Group e IAM Role](#log-group-e-iam-role)
-      - [DLQ, SNS Topic y CloudWatch Alarm](#dlq-sns-topic-y-cloudwatch-alarm)
+      - [DLQ y CloudWatch Alarm](#dlq-y-cloudwatch-alarm)
       - [Lambda Function](#lambda-function)
       - [Systems Manager String Parameter](#systems-manager-string-parameter-2)
     - [Lambda Executor](#lambda-executor)
@@ -25,7 +27,7 @@
     - [Recursos para Schedulers](#recursos-para-schedulers)
       - [Schedule Group](#schedule-group)
       - [Dead Letter Queue](#dead-letter-queue)
-      - [SNS Topic y CloudWatch Alarm](#sns-topic-y-cloudwatch-alarm-1)
+      - [CloudWatch Alarm](#cloudwatch-alarm-1)
       - [IAM Role](#iam-role)
       - [Systems Manager String Parameter](#systems-manager-string-parameter-4)
     - [API Calendarizar Procesos](#api-calendarizar-procesos)
@@ -156,9 +158,33 @@ StringParameter stringParameterDynamoCalendarizaciones = new(this, ..., new Stri
 });
 ```
 
+### Sistema de Notificaciones
+
+En segundo lugar, se creará un sistema a usar para notificar eventos de interés al equipo productivo. Entre los eventos de interés se encontrará las CloudWatch Alarms que monitorean las DLQ.
+
+#### SNS Topic y Subscriptions
+
+El sistema consiste en un SNS Topic con email subscriptions.
+
+<ins>Código para crear SNS Topic con Email Subscriptions:</ins>
+
+```csharp
+using Amazon.CDK.AWS.SNS;
+using Amazon.CDK.AWS.SNS.Subscriptions;
+
+// Se crea SNS topic para notificaciones...
+Topic topic = new(this, ..., new TopicProps {
+    TopicName = ...,
+});
+
+foreach (string email in notificationEmails.Split(",")) {
+    topic.AddSubscription(new EmailSubscription(email));
+}
+```
+
 ### Sistema de Colas
 
-En segundo lugar, dado que no se conoce la cantidad ni duración de los procesos a ejecutar, se contará con un sistema de colas para no saturar la [Lambda Executor](#lambda-executor).
+En tercer lugar, dado que no se conoce la cantidad ni duración de los procesos a ejecutar, se contará con un sistema de colas para no saturar la [Lambda Executor](#lambda-executor).
 
 #### SQS Queue y Dead Letter Queue
 
@@ -188,26 +214,15 @@ Queue queue = new(this, ..., new QueueProps {
 });
 ```
 
-#### SNS Topic y CloudWatch Alarm
+#### CloudWatch Alarm
 
-Además, se crea un Topic y Alarm para notificar al equipo productivo que hubo un problema gatillando un proceso y éste cayó en la DLQ.
+Además, se creará la Alarm que monitorea [la DLQ](#sqs-queue-y-dead-letter-queue) y publica notificaciones en el [Topic creado anteriormente](#sns-topic-y-subscriptions).
 
-<ins>Código para crear SNS Topic y CloudWatch Alarm:</ins>
+<ins>Código para crear CloudWatch Alarm:</ins>
 
 ```csharp
-using Amazon.CDK.AWS.SNS;
-using Amazon.CDK.AWS.SNS.Subscriptions;
 using Amazon.CDK.AWS.CloudWatch;
 using Amazon.CDK.AWS.CloudWatch.Actions;
-
-// Se crea SNS topic para notificaciones asociadas a la instancia...
-Topic topic = new(this, ..., new TopicProps {
-    TopicName = ...,
-});
-
-foreach (string email in notificationEmails.Split(",")) {
-    topic.AddSubscription(new EmailSubscription(email));
-}
 
 // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
 Alarm alarm = new(this, ..., new AlarmProps {
@@ -245,7 +260,7 @@ StringParameter stringParameterQueueUrl = new(this, ..., new StringParameterProp
 
 ### Lambda Dispatcher
 
-En tercer lugar, se creará una Lambda cuyo proposito será obtener todos los procesos habilitados asociados a una calendarización e ingresarlos en la [cola para su ejecución](#sqs-queue-y-dead-letter-queue).
+En cuarto lugar, se creará una Lambda cuyo proposito será obtener todos los procesos habilitados asociados a una calendarización e ingresarlos en la [cola para su ejecución](#sqs-queue-y-dead-letter-queue).
 
 #### Log Group e IAM Role
 
@@ -315,17 +330,15 @@ Role roleDispatcherLambda = new(this, ..., new RoleProps {
 > [!NOTE]
 > Destacar como el Role de la Lambda requiere acceso de lectura sobre la [DynamoDB que administra los procesos](#dynamodb-tables-y-global-secondary-index), acceso para ingresar mensajes a [la cola de procesos despachados](#sqs-queue-y-dead-letter-queue), y acceso para obtener los parámetros que almacenan estos dos valores.
 
-#### DLQ, SNS Topic y CloudWatch Alarm
+#### DLQ y CloudWatch Alarm
 
-Además, se crea una DLQ para la Lambda Dispatcher y su respectivo SNS Topic y Alarm.
+Además, se crea una DLQ para la Lambda Dispatcher y su respectiva Alarm.
 
-<ins>Código para crear DLQ, SNS Topic y Alarm:</ins>
+<ins>Código para crear DLQ y Alarm:</ins>
 
 ```csharp
 using Amazon.CDK.AWS.CloudWatch;
 using Amazon.CDK.AWS.CloudWatch.Actions;
-using Amazon.CDK.AWS.SNS;
-using Amazon.CDK.AWS.SNS.Subscriptions;
 using Amazon.CDK.AWS.SQS;
 
 // Creación de una DLQ con su respectivo Topic y Alarm...
@@ -334,14 +347,6 @@ Queue dispatcherDlq = new(this, ..., new QueueProps {
     RetentionPeriod = Duration.Days(14),
     EnforceSSL = true
 });
-
-Topic dispatcherTopic = new(this, ..., new TopicProps {
-    TopicName = ...,
-});
-
-foreach (string email in notificationEmails.Split(",")) {
-    dispatcherTopic.AddSubscription(new EmailSubscription(email));
-}
 
 // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
 Alarm dispatcherAlarm = new(this, ..., new AlarmProps {
@@ -357,7 +362,7 @@ Alarm dispatcherAlarm = new(this, ..., new AlarmProps {
     ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
     TreatMissingData = TreatMissingData.NOT_BREACHING,
 });
-dispatcherAlarm.AddAlarmAction(new SnsAction(dispatcherTopic));
+dispatcherAlarm.AddAlarmAction(new SnsAction(topic));
 ```
 
 #### Lambda Function
@@ -406,7 +411,7 @@ StringParameter stringParameterDispatcherFunction = new(this, ..., new StringPar
 
 ### Lambda Executor
 
-En cuarto lugar, se creará una Lambda cuyo proposito será gatillar la ejecución de los procesos según lo que obtenga desde la [cola de procesos](#sqs-queue-y-dead-letter-queue).
+En quinto lugar, se creará una Lambda cuyo proposito será gatillar la ejecución de los procesos según lo que obtenga desde la [cola de procesos](#sqs-queue-y-dead-letter-queue).
 
 #### Log Group e IAM Role
 
@@ -518,7 +523,7 @@ executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProp
 
 ### Recursos para Schedulers
 
-En quinto lugar, se crearán los recursos necesarios para la creación de los schedulers, esto incluye el schedule group, la DLQ con su respectivo Alarm y SNS Topic, IAM Role y String Parameters.
+En sexto lugar, se crearán los recursos necesarios para la creación de los schedulers, esto incluye el schedule group, la DLQ con su respectivo Alarm, IAM Role y String Parameters.
 
 #### Schedule Group
 
@@ -551,26 +556,15 @@ Queue schedulerDlq = new(this, ..., new QueueProps {
 });
 ```
 
-#### SNS Topic y CloudWatch Alarm
+#### CloudWatch Alarm
 
-Por otro lado, también se creará el Topic y Alarm para notificar al equipo productivo en caso de que lleguen mensajes al DLQ de los Schedulers.
+Por otro lado, también se creará la Alarm para monitorear la DLQ de los Schedulers.
 
-<ins>Código para crear SNS Topic y CloudWatch Alarm:</ins>
+<ins>Código para crear CloudWatch Alarm:</ins>
 
 ```csharp
-using Amazon.CDK.AWS.SNS;
-using Amazon.CDK.AWS.SNS.Subscriptions;
 using Amazon.CDK.AWS.CloudWatch;
 using Amazon.CDK.AWS.CloudWatch.Actions;
-
-// Se crea SNS topic para notificaciones asociadas a la instancia...
-Topic topicScheduleDlq = new(this, ..., new TopicProps {
-    TopicName = ...,
-});
-
-foreach (string email in notificationEmails.Split(",")) {
-    topicScheduleDlq.AddSubscription(new EmailSubscription(email));
-}
 
 // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
 Alarm alarmScheduleDlq = new(this, ..., new AlarmProps {
@@ -586,7 +580,7 @@ Alarm alarmScheduleDlq = new(this, ..., new AlarmProps {
     ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
     TreatMissingData = TreatMissingData.NOT_BREACHING,
 });
-alarmScheduleDlq.AddAlarmAction(new SnsAction(topicScheduleDlq));
+alarmScheduleDlq.AddAlarmAction(new SnsAction(topic));
 ```
 
 #### IAM Role

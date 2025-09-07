@@ -109,6 +109,17 @@ namespace KairosCdk
             });
             #endregion
 
+            #region SNS Topic
+            // Se crea SNS topic para notificaciones...
+            Topic topic = new(this, $"{appName}NotificationSNSTopic", new TopicProps {
+                TopicName = $"{appName}NotificationSNSTopic",
+            });
+
+            foreach (string email in notificationEmails.Split(",")) {
+                topic.AddSubscription(new EmailSubscription(email));
+            }
+            #endregion
+
             #region SQS
             // Creación de cola...
             Queue dlq = new(this, $"{appName}DeadLetterQueue", new QueueProps {
@@ -127,15 +138,6 @@ namespace KairosCdk
                     MaxReceiveCount = 3,
                 },
             });
-
-            // Se crea SNS topic para notificaciones asociadas a la instancia...
-            Topic topic = new(this, $"{appName}DeadLetterQueueSNSTopic", new TopicProps {
-                TopicName = $"{appName}DeadLetterQueueSNSTopic",
-            });
-
-            foreach (string email in notificationEmails.Split(",")) {
-                topic.AddSubscription(new EmailSubscription(email));
-            }
 
             // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
             Alarm alarm = new(this, $"{appName}DeadLetterQueueAlarm", new AlarmProps {
@@ -217,20 +219,12 @@ namespace KairosCdk
                 }
             });
 
-            // Creación de una DLQ con su respectivo Topic y Alarm...
+            // Creación de una DLQ con su respectivo Alarm...
             Queue dispatcherDlq = new(this, $"{appName}DispatcherDeadLetterQueue", new QueueProps {
                 QueueName = $"{appName}DispatcherDeadLetterQueue",
                 RetentionPeriod = Duration.Days(14),
                 EnforceSSL = true
             });
-
-            Topic dispatcherTopic = new(this, $"{appName}DispatcherDeadLetterQueueSNSTopic", new TopicProps {
-                TopicName = $"{appName}DispatcherDeadLetterQueueSNSTopic",
-            });
-
-            foreach (string email in notificationEmails.Split(",")) {
-                dispatcherTopic.AddSubscription(new EmailSubscription(email));
-            }
 
             // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
             Alarm dispatcherAlarm = new(this, $"{appName}DispatcherDeadLetterQueueAlarm", new AlarmProps {
@@ -246,7 +240,7 @@ namespace KairosCdk
                 ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
                 TreatMissingData = TreatMissingData.NOT_BREACHING,
             });
-            dispatcherAlarm.AddAlarmAction(new SnsAction(dispatcherTopic));
+            dispatcherAlarm.AddAlarmAction(new SnsAction(topic));
 
             // Creación de la función lambda...
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
@@ -364,16 +358,7 @@ namespace KairosCdk
                 StringValue = schedulerDlq.QueueArn,
                 Tier = ParameterTier.STANDARD,
             });
-
-            // Se crea SNS topic para notificaciones asociadas a la instancia...
-            Topic topicScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueSNSTopic", new TopicProps {
-                TopicName = $"{appName}ScheduleDeadLetterQueueSNSTopic",
-            });
-
-            foreach (string email in notificationEmails.Split(",")) {
-                topicScheduleDlq.AddSubscription(new EmailSubscription(email));
-            }
-
+                        
             // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
             Alarm alarmScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueAlarm", new AlarmProps {
                 AlarmName = $"{appName}ScheduleDeadLetterQueueAlarm",
@@ -388,7 +373,7 @@ namespace KairosCdk
                 ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
                 TreatMissingData = TreatMissingData.NOT_BREACHING,
             });
-            alarmScheduleDlq.AddAlarmAction(new SnsAction(topicScheduleDlq));
+            alarmScheduleDlq.AddAlarmAction(new SnsAction(topic));
 
             // Creación de role usado por Scheduler para gatillar dispatcher lambda...
             Role roleScheduler = new(this, $"{appName}SchedulerRole", new RoleProps {
