@@ -217,14 +217,13 @@ namespace KairosCdk
                 }
             });
 
-            // Creación de una DLQ con su Topic y Alarm...
+            // Creación de una DLQ con su respectivo Topic y Alarm...
             Queue dispatcherDlq = new(this, $"{appName}DispatcherDeadLetterQueue", new QueueProps {
                 QueueName = $"{appName}DispatcherDeadLetterQueue",
                 RetentionPeriod = Duration.Days(14),
                 EnforceSSL = true
             });
 
-            // Se crea SNS topic para notificaciones asociadas a la instancia...
             Topic dispatcherTopic = new(this, $"{appName}DispatcherDeadLetterQueueSNSTopic", new TopicProps {
                 TopicName = $"{appName}DispatcherDeadLetterQueueSNSTopic",
             });

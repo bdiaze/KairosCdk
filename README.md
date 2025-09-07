@@ -15,6 +15,7 @@
       - [Systems Manager String Parameter](#systems-manager-string-parameter-1)
     - [Lambda Dispatcher](#lambda-dispatcher)
       - [Log Group e IAM Role](#log-group-e-iam-role)
+      - [DLQ, SNS Topic y CloudWatch Alarm](#dlq-sns-topic-y-cloudwatch-alarm)
       - [Lambda Function](#lambda-function)
       - [Systems Manager String Parameter](#systems-manager-string-parameter-2)
     - [Lambda Executor](#lambda-executor)
@@ -314,6 +315,51 @@ Role roleDispatcherLambda = new(this, ..., new RoleProps {
 > [!NOTE]
 > Destacar como el Role de la Lambda requiere acceso de lectura sobre la [DynamoDB que administra los procesos](#dynamodb-tables-y-global-secondary-index), acceso para ingresar mensajes a [la cola de procesos despachados](#sqs-queue-y-dead-letter-queue), y acceso para obtener los parámetros que almacenan estos dos valores.
 
+#### DLQ, SNS Topic y CloudWatch Alarm
+
+Además, se crea una DLQ para la Lambda Dispatcher y su respectivo SNS Topic y Alarm.
+
+<ins>Código para crear DLQ, SNS Topic y Alarm:</ins>
+
+```csharp
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.CloudWatch.Actions;
+using Amazon.CDK.AWS.SNS;
+using Amazon.CDK.AWS.SNS.Subscriptions;
+using Amazon.CDK.AWS.SQS;
+
+// Creación de una DLQ con su respectivo Topic y Alarm...
+Queue dispatcherDlq = new(this, ..., new QueueProps {
+    QueueName = ...,
+    RetentionPeriod = Duration.Days(14),
+    EnforceSSL = true
+});
+
+Topic dispatcherTopic = new(this, ..., new TopicProps {
+    TopicName = ...,
+});
+
+foreach (string email in notificationEmails.Split(",")) {
+    dispatcherTopic.AddSubscription(new EmailSubscription(email));
+}
+
+// Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+Alarm dispatcherAlarm = new(this, ..., new AlarmProps {
+    AlarmName = ...,
+    AlarmDescription = ...,
+    Metric = dispatcherDlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+        Period = Duration.Minutes(5),
+        Statistic = Stats.MAXIMUM,
+    }),
+    Threshold = 1,
+    EvaluationPeriods = 1,
+    DatapointsToAlarm = 1,
+    ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    TreatMissingData = TreatMissingData.NOT_BREACHING,
+});
+dispatcherAlarm.AddAlarmAction(new SnsAction(dispatcherTopic));
+```
+
 #### Lambda Function
 
 Se continua con la creación de la función Lambda que despachará los procesos a ejecutar.
@@ -338,6 +384,8 @@ Function dispatcherFunction = new(this, ..., new FunctionProps {
         { "APP_NAME", ... },
     },
     Role = roleDispatcherLambda,
+    DeadLetterQueueEnabled = true,
+    DeadLetterQueue = dispatcherDlq,
 });
 ```
 
