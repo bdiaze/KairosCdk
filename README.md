@@ -470,7 +470,7 @@ executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProp
 
 ### Recursos para Schedulers
 
-En quinto lugar, se crearán los recursos necesarios para la creación de los schedulers, esto incluye el schedule group, la DLQ con su respectivo Alarm y SNS Topic, IAM Role e String Parameters.
+En quinto lugar, se crearán los recursos necesarios para la creación de los schedulers, esto incluye el schedule group, la DLQ con su respectivo Alarm y SNS Topic, IAM Role y String Parameters.
 
 #### Schedule Group
 
