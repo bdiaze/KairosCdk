@@ -88,16 +88,63 @@ En primer lugar, se comenzará creando las tablas necesarias para almacenar la i
 
 #### DynamoDB Tables y Global Secondary Index
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Tables y Global Secondary Index:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.DynamoDB;
+
+// Se crean tablas para registrar los procesos y calendarizaciones...
+Table tablaProcesos = new(this, ..., new TableProps {
+    TableName = $"{...}Procesos",
+    PartitionKey = new Attribute { 
+        Name = "IdProceso",
+        Type = AttributeType.STRING
+    },
+    DeletionProtection = true,
+    BillingMode = BillingMode.PAY_PER_REQUEST,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
+
+tablaProcesos.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps {
+    IndexName = $"PorIdCalendarizacion",
+    PartitionKey = new Attribute {
+        Name = "IdCalendarizacion",
+        Type = AttributeType.STRING
+    },
+});
+
+Table tablaCalendarizacion = new(this, ..., new TableProps {
+    TableName = $"{...}Calendarizaciones",
+    PartitionKey = new Attribute {
+        Name = "IdCalendarizacion",
+        Type = AttributeType.STRING
+    },
+    DeletionProtection = true,
+    BillingMode = BillingMode.PAY_PER_REQUEST,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SSM;
+
+StringParameter stringParameterDynamoProcesos = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/DynamoDB/NombreTablaProcesos",
+    Description = ...,
+    StringValue = tablaProcesos.TableName,
+    Tier = ParameterTier.STANDARD,
+});
+
+StringParameter stringParameterDynamoCalendarizaciones = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/DynamoDB/NombreTablaCalendarizaciones",
+    Description = ...,
+    StringValue = tablaCalendarizacion.TableName,
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 ### Sistema de Colas
@@ -106,23 +153,77 @@ En segundo lugar, dado que no se conoce la cantidad ni duración de los procesos
 
 #### SQS Queue y Dead Letter Queue
 
-<ins>Código para crear :</ins>
+<ins>Código para crear SQS Queue y DLQ:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SQS;
+
+// Creación de cola...
+Queue dlq = new(this, ..., new QueueProps {
+    QueueName = $"{...}DeadLetterQueue",
+    RetentionPeriod = Duration.Days(14),
+    EnforceSSL = true,
+});
+
+Queue queue = new(this, ..., new QueueProps {
+    QueueName = $"{...}Queue",
+    RetentionPeriod = Duration.Days(14),
+    VisibilityTimeout = Duration.Seconds(Math.Round(double.Parse(...) * 1.5)),
+    EnforceSSL = true,
+    DeadLetterQueue = new DeadLetterQueue {
+        Queue = dlq,
+        MaxReceiveCount = 3,
+    },
+});
 ```
 
 #### SNS Topic y CloudWatch Alarm
 
-<ins>Código para crear :</ins>
+<ins>Código para crear SNS Topic y CloudWatch Alarm:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SNS;
+using Amazon.CDK.AWS.CloudWatch;
+
+// Se crea SNS topic para notificaciones asociadas a la instancia...
+Topic topic = new(this, ..., new TopicProps {
+    TopicName = ...,
+});
+
+foreach (string email in notificationEmails.Split(",")) {
+    topic.AddSubscription(new EmailSubscription(email));
+}
+
+// Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+Alarm alarm = new(this, ..., new AlarmProps {
+    AlarmName = ...,
+    AlarmDescription = ...,
+    Metric = dlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+        Period = Duration.Minutes(5),
+        Statistic = Stats.MAXIMUM,
+    }),
+    Threshold = 1,
+    EvaluationPeriods = 1,
+    DatapointsToAlarm = 1,
+    ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    TreatMissingData = TreatMissingData.NOT_BREACHING,
+});
+alarm.AddAlarmAction(new SnsAction(topic));
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SSM;
+
+StringParameter stringParameterQueueUrl = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/SQS/QueueUrl",
+    Description = ...,
+    StringValue = queue.QueueUrl,
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 ### Lambda Dispatcher
@@ -131,23 +232,104 @@ En tercer lugar, se creará una Lambda cuyo proposito será obtener todos los pr
 
 #### Log Group e IAM Role
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Log Group y Role:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.IAM;
+
+// Creación de log group lambda...
+LogGroup dispatcherLogGroup = new(this, ..., new LogGroupProps {
+    LogGroupName = ...,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
+
+// Creación de role para la función lambda...
+Role roleDispatcherLambda = new(this, ..., new RoleProps {
+    RoleName = ...,
+    Description = ...,
+    AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
+    ManagedPolicies = [
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole"),
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+    ],
+    InlinePolicies = new Dictionary<string, PolicyDocument> {
+        {
+            ...,
+            new PolicyDocument(new PolicyDocumentProps {
+                Statements = [
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "ssm:GetParameter"
+                        ],
+                        Resources = [
+                            stringParameterDynamoProcesos.ParameterArn,
+                            stringParameterQueueUrl.ParameterArn,
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "sqs:SendMessage"
+                        ],
+                        Resources = [
+                            queue.QueueArn
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "dynamodb:Query"
+                        ],
+                        Resources = [
+                            tablaProcesos.TableArn,
+                            $"{tablaProcesos.TableArn}/*",
+                        ],
+                    })
+                ]
+            })
+        }
+    }
+});
 ```
 
 #### Lambda Function
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Lambda Function:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.Lambda;
+
+// Creación de la función lambda...
+Function dispatcherFunction = new(this, ..., new FunctionProps {
+    FunctionName = ...,
+    Description = ...,
+    Runtime = Runtime.DOTNET_8,
+    Handler = dispatcherHandler,
+    Code = Code.FromAsset($"{...}/publish/publish.zip"),
+    Timeout = Duration.Seconds(double.Parse(...)),
+    MemorySize = double.Parse(...),
+    Architecture = Architecture.X86_64,
+    LogGroup = dispatcherLogGroup,
+    Environment = new Dictionary<string, string> {
+        { "APP_NAME", ... },
+    },
+    Role = roleDispatcherLambda,
+});
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+StringParameter stringParameterDispatcherFunction = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Dispatcher/LambdaArn",
+    Description = ...,
+    StringValue = dispatcherFunction.FunctionArn,
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 ### Lambda Executor
@@ -156,23 +338,101 @@ En cuarto lugar, se creará una Lambda cuyo proposito será gatillar la ejecuci�
 
 #### Log Group e IAM Role
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Log Group y Role:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.IAM;
+
+// Creación de log group lambda...
+LogGroup executorLogGroup = new(this, ..., new LogGroupProps {
+    LogGroupName = ...,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
+
+// Creación de role para la función lambda...
+Role roleExecutorLambda = new(this, ..., new RoleProps {
+    RoleName = ...,
+    Description = ...,
+    AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
+    ManagedPolicies = [
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole"),
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+    ],
+    InlinePolicies = new Dictionary<string, PolicyDocument> {
+        {
+            ...,
+            new PolicyDocument(new PolicyDocumentProps {
+                Statements = [
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "sts:AssumeRole",
+                        ],
+                        Resources = [
+                            $"arn:aws:iam::{this.Account}:role/{executorPrefixRoles}*"
+                        ],
+                    }),
+                ]
+            })
+        }
+    }
+});
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SSM;
+
+_ = new StringParameter(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Executor/RoleArn",
+    Description = ...,
+    StringValue = roleExecutorLambda.RoleArn,
+    Tier = ParameterTier.STANDARD,
+});
+
+_ = new StringParameter(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Executor/PrefixRoles",
+    Description = ...,
+    StringValue = executorPrefixRoles,
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 #### Lambda Function (con Event Source)
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Lambda con Event Source:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.Lambda;
+using Amazon.CDK.AWS.Lambda.EventSources;
+
+// Creación de la función lambda...
+Function executorFunction = new(this, ..., new FunctionProps {
+    FunctionName = ...,
+    Description = ...,
+    Runtime = Runtime.DOTNET_8,
+    Handler = executorHandler,
+    Code = Code.FromAsset($"{...}/publish/publish.zip"),
+    Timeout = Duration.Seconds(double.Parse(...)),
+    MemorySize = double.Parse(...),
+    Architecture = Architecture.X86_64,
+    LogGroup = executorLogGroup,
+    Environment = new Dictionary<string, string> {
+        { "APP_NAME", ... },
+    },
+    Role = roleExecutorLambda,
+});
+
+executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
+    Enabled = true,
+    BatchSize = Math.Round(double.Parse(...) * 5 * 0.5),
+    MaxBatchingWindow = Duration.Seconds(30),
+    ReportBatchItemFailures = true,
+}));
 ```
 
 ### Recursos para Schedulers
@@ -181,37 +441,134 @@ En quinto lugar, se crearán los recursos necesarios para la creación de los sc
 
 #### Schedule Group
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Schedule Group:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.Scheduler;
+
+CfnScheduleGroup scheduleGroup = new(this, ..., new CfnScheduleGroupProps {
+    Name = ...
+});
 ```
 
 #### Dead Letter Queue
 
-<ins>Código para crear :</ins>
+<ins>Código para crear DLQ:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SQS;
+
+// Creación de cola...
+Queue schedulerDlq = new(this, ..., new QueueProps {
+    QueueName = ...,
+    RetentionPeriod = Duration.Days(14),
+    EnforceSSL = true,
+});
 ```
 
 #### SNS Topic y CloudWatch Alarm
 
-<ins>Código para crear :</ins>
+<ins>Código para crear SNS Topic y CloudWatch Alarm:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SNS;
+using Amazon.CDK.AWS.SNS.Subscriptions;
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.CloudWatch.Actions;
+
+// Se crea SNS topic para notificaciones asociadas a la instancia...
+Topic topicScheduleDlq = new(this, ..., new TopicProps {
+    TopicName = ...,
+});
+
+foreach (string email in notificationEmails.Split(",")) {
+    topicScheduleDlq.AddSubscription(new EmailSubscription(email));
+}
+
+// Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+Alarm alarmScheduleDlq = new(this, ..., new AlarmProps {
+    AlarmName = ...,
+    AlarmDescription = ...,
+    Metric = schedulerDlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+        Period = Duration.Minutes(5),
+        Statistic = Stats.MAXIMUM,
+    }),
+    Threshold = 1,
+    EvaluationPeriods = 1,
+    DatapointsToAlarm = 1,
+    ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    TreatMissingData = TreatMissingData.NOT_BREACHING,
+});
+alarmScheduleDlq.AddAlarmAction(new SnsAction(topicScheduleDlq));
 ```
 
 #### IAM Role
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Role:</ins>
 
 ```csharp
+// Creación de role usado por Scheduler para gatillar dispatcher lambda...
+Role roleScheduler = new(this, ..., new RoleProps {
+    RoleName = ...,
+    Description = ...,
+    AssumedBy = new ServicePrincipal("scheduler.amazonaws.com"),
+    InlinePolicies = new Dictionary<string, PolicyDocument> {
+        {
+            ...,
+            new PolicyDocument(new PolicyDocumentProps {
+                Statements = [
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "lambda:InvokeFunction"
+                        ],
+                        Resources = [
+                            dispatcherFunction.FunctionArn
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "sqs:SendMessage"
+                        ],
+                        Resources = [
+                            schedulerDlq.QueueArn
+                        ],
+                    })
+                ]
+            })
+        }
+    }
+});
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SSM;
+
+StringParameter stringParameterScheduleGroup = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Schedule/NombreGrupo",
+    Description = ...,
+    StringValue = scheduleGroup.Name,
+    Tier = ParameterTier.STANDARD,
+});
+
+StringParameter stringParameterScheduleDlq = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Schedule/DeadLetterQueueArn",
+    Description = ...,
+    StringValue = schedulerDlq.QueueArn,
+    Tier = ParameterTier.STANDARD,
+});
+
+StringParameter stringParameterRoleScheduler = new(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Schedule/RoleArn",
+    Description = ...,
+    StringValue = roleScheduler.RoleArn,
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 ### API Calendarizar Procesos
@@ -220,58 +577,234 @@ En último lugar, se creará la API que calendarizará la ejecución de procesos
 
 #### Log Group e IAM Role
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Log Group y Role:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.IAM;
+
+// Creación de log group lambda...
+LogGroup logGroup = new(this, ..., new LogGroupProps {
+    LogGroupName = ...,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
+
+// Creación de role para la función lambda...
+Role roleLambda = new(this, ..., new RoleProps {
+    RoleName = ...,
+    Description = ...,
+    AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
+    ManagedPolicies = [
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole"),
+        ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
+    ],
+    InlinePolicies = new Dictionary<string, PolicyDocument> {
+        {
+            ...,
+            new PolicyDocument(new PolicyDocumentProps {
+                Statements = [
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "ssm:GetParameter"
+                        ],
+                        Resources = [
+                            stringParameterDynamoProcesos.ParameterArn,
+                            stringParameterDynamoCalendarizaciones.ParameterArn,
+                            stringParameterRoleScheduler.ParameterArn,
+                            stringParameterDispatcherFunction.ParameterArn,
+                            stringParameterScheduleGroup.ParameterArn,
+                            stringParameterScheduleDlq.ParameterArn,
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "scheduler:CreateSchedule",
+                            "scheduler:DeleteSchedule",
+                            "scheduler:GetSchedule",
+                        ],
+                        Resources = [
+                            $"arn:aws:scheduler:{this.Region}:{this.Account}:schedule/{scheduleGroup.Name}/*"
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "dynamodb:PutItem",
+                            "dynamodb:DeleteItem",
+                            "dynamodb:GetItem",
+                            "dynamodb:Query"
+                        ],
+                        Resources = [
+                            tablaProcesos.TableArn,
+                            $"{tablaProcesos.TableArn}/*",
+                            tablaCalendarizacion.TableArn,
+                            $"{tablaCalendarizacion.TableArn}/*",
+                        ],
+                    }),
+                    new PolicyStatement(new PolicyStatementProps{
+                        Sid = ...,
+                        Actions = [
+                            "iam:PassRole",
+                        ],
+                        Resources = [
+                            roleScheduler.RoleArn
+                        ],
+                    })
+                ]
+            })
+        }
+    }
+});
 ```
 
 #### Lambda Function
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Lambda Function:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.Lambda;
+
+// Creación de la función lambda...
+Function function = new(this, ..., new FunctionProps {
+    FunctionName = ...,
+    Description = ...,
+    Runtime = Runtime.DOTNET_8,
+    Handler = ...,
+    Code = Code.FromAsset($"{...}/publish/publish.zip"),
+    Timeout = Duration.Seconds(double.Parse(...)),
+    MemorySize = double.Parse(...),
+    Architecture = Architecture.X86_64,
+    LogGroup = logGroup,
+    Environment = new Dictionary<string, string> {
+        { "APP_NAME", ... },
+    },
+    Role = roleLambda,
+});
 ```
 
 #### Access Log Group
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Log Group:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.CloudWatch;
+
+// Creación de access logs...
+LogGroup logGroupAccessLogs = new(this, ..., new LogGroupProps {
+    LogGroupName = ...,
+    Retention = RetentionDays.ONE_MONTH,
+    RemovalPolicy = RemovalPolicy.DESTROY
+});
 ```
 
 #### Lambda Rest API
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Lambda Rest API:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.APIGateway;
+
+// Creación de la LambdaRestApi...
+LambdaRestApi lambdaRestApi = new(this, ..., new LambdaRestApiProps {
+    RestApiName = ...,
+    Handler = function,
+    DeployOptions = new StageOptions {
+        AccessLogDestination = new LogGroupLogDestination(logGroupAccessLogs),
+        AccessLogFormat = AccessLogFormat.Custom("'{\"requestTime\":\"$context.requestTime\",\"requestId\":\"$context.requestId\",\"httpMethod\":\"$context.httpMethod\",\"path\":\"$context.path\",\"resourcePath\":\"$context.resourcePath\",\"status\":$context.status,\"responseLatency\":$context.responseLatency,\"xrayTraceId\":\"$context.xrayTraceId\",\"integrationRequestId\":\"$context.integration.requestId\",\"functionResponseStatus\":\"$context.integration.status\",\"integrationLatency\":\"$context.integration.latency\",\"integrationServiceStatus\":\"$context.integration.integrationStatus\",\"authorizeStatus\":\"$context.authorize.status\",\"authorizerStatus\":\"$context.authorizer.status\",\"authorizerLatency\":\"$context.authorizer.latency\",\"authorizerRequestId\":\"$context.authorizer.requestId\",\"ip\":\"$context.identity.sourceIp\",\"userAgent\":\"$context.identity.userAgent\",\"principalId\":\"$context.authorizer.principalId\"}'"),
+        StageName = ...,
+        Description = ...,
+    },
+    DefaultMethodOptions = new MethodOptions {
+        ApiKeyRequired = true,                   
+    },
+});
 ```
 
 #### API Mapping
 
-<ins>Código para crear :</ins>
+<ins>Código para crear API Mapping:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.Apigatewayv2;
+
+// Creación de la CfnApiMapping para el API Gateway...
+CfnApiMapping apiMapping = new(this, ..., new CfnApiMappingProps {
+    DomainName = ...,
+    ApiMappingKey = ...,
+    ApiId = lambdaRestApi.RestApiId,
+    Stage = lambdaRestApi.DeploymentStage.StageName,
+});
 ```
 
 #### Usage Plan y API Key
 
-<ins>Código para crear :</ins>
+<ins>Código para crear Usage Plan y API Key:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.APIGateway;
+
+// Se crea Usage Plan para configurar API Key...
+UsagePlan usagePlan = new(this, ..., new UsagePlanProps {
+    Name = ...,
+    Description = ...,
+    ApiStages = [
+        new UsagePlanPerApiStage() {
+            Api = lambdaRestApi,
+            Stage = lambdaRestApi.DeploymentStage
+        }
+    ],
+});
+
+// Se crea API Key...
+ApiKey apiGatewayKey = new(this, ..., new ApiKeyProps {
+    ApiKeyName = ...,
+    Description = ...,
+});
+usagePlan.AddApiKey(apiGatewayKey);
 ```
 
 #### API Gateway Permission
 
-<ins>Código para crear :</ins>
+<ins>Código para crear API Gateway Permission:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.IAM;
+using Amazon.CDK.AWS.Lambda;
+
+// Se configura permisos para la ejecucíon de la Lambda desde el API Gateway...
+ArnPrincipal arnPrincipal = new("apigateway.amazonaws.com");
+Permission permission = new() {
+    Scope = this,
+    Action = "lambda:InvokeFunction",
+    Principal = arnPrincipal,
+    SourceArn = $"arn:aws:execute-api:{this.Region}:{this.Account}:{lambdaRestApi.RestApiId}/*/*/*",
+};
+function.AddPermission(..., permission);
 ```
 
 #### Systems Manager String Parameter
 
-<ins>Código para crear :</ins>
+<ins>Código para crear String Parameter:</ins>
 
 ```csharp
+using Amazon.CDK.AWS.SSM;
+
+// Se configuran parámetros para ser rescatados por consumidores...
+_ = new StringParameter(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Api/Url",
+    Description = ...,
+    StringValue = $"https://{apiMapping.DomainName}/{apiMapping.ApiMappingKey}/",
+    Tier = ParameterTier.STANDARD,
+});
+
+_ = new StringParameter(this, ..., new StringParameterProps {
+    ParameterName = $"/{...}/Api/KeyId",
+    Description = ...,
+    StringValue = $"{apiGatewayKey.KeyId}",
+    Tier = ParameterTier.STANDARD,
+});
 ```
 
 ## Lógica de Lambdas
