@@ -316,9 +316,9 @@ Role roleDispatcherLambda = new(this, ..., new RoleProps {
 
 #### Lambda Function
 
-<ins>Código para crear Lambda Function:</ins>
-
 Se continua con la creación de la función Lambda que despachará los procesos a ejecutar.
+
+<ins>Código para crear Lambda Function:</ins>
 
 ```csharp
 using Amazon.CDK.AWS.Lambda;
