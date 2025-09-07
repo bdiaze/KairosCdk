@@ -411,7 +411,7 @@ Role roleExecutorLambda = new(this, ..., new RoleProps {
 
 #### Systems Manager String Parameter
 
-Por último se crean parámetros para almacenar el ARN del Role de la Lambda Executor (para que los Roles de ejecución le permitan asumirlos) y el prefijo que deben tener los Roles de ejecución.
+Se crean los parámetros para almacenar el ARN del Role de la Lambda Executor (para que los Roles de ejecución le permitan asumirlos) y el prefijo que deben tener los Roles de ejecución.
 
 <ins>Código para crear String Parameter:</ins>
 
