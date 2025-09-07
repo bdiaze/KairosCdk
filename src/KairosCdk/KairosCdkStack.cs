@@ -217,6 +217,38 @@ namespace KairosCdk
                 }
             });
 
+            // Creación de una DLQ con su Topic y Alarm...
+            Queue dispatcherDlq = new(this, $"{appName}DispatcherDeadLetterQueue", new QueueProps {
+                QueueName = $"{appName}DispatcherDeadLetterQueue",
+                RetentionPeriod = Duration.Days(14),
+                EnforceSSL = true
+            });
+
+            // Se crea SNS topic para notificaciones asociadas a la instancia...
+            Topic dispatcherTopic = new(this, $"{appName}DispatcherDeadLetterQueueSNSTopic", new TopicProps {
+                TopicName = $"{appName}DispatcherDeadLetterQueueSNSTopic",
+            });
+
+            foreach (string email in notificationEmails.Split(",")) {
+                dispatcherTopic.AddSubscription(new EmailSubscription(email));
+            }
+
+            // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
+            Alarm dispatcherAlarm = new(this, $"{appName}DispatcherDeadLetterQueueAlarm", new AlarmProps {
+                AlarmName = $"{appName}DispatcherDeadLetterQueueAlarm",
+                AlarmDescription = $"Alarma para notificar cuando llega algun elemento a la Dispatcher DLQ de {appName}",
+                Metric = dispatcherDlq.MetricApproximateNumberOfMessagesVisible(new MetricOptions {
+                    Period = Duration.Minutes(5),
+                    Statistic = Stats.MAXIMUM,
+                }),
+                Threshold = 1,
+                EvaluationPeriods = 1,
+                DatapointsToAlarm = 1,
+                ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                TreatMissingData = TreatMissingData.NOT_BREACHING,
+            });
+            dispatcherAlarm.AddAlarmAction(new SnsAction(dispatcherTopic));
+
             // Creación de la función lambda...
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}DispatcherLambdaFunction",
@@ -232,6 +264,8 @@ namespace KairosCdk
                     { "APP_NAME", appName },
                 },
                 Role = roleDispatcherLambda,
+                DeadLetterQueueEnabled = true,
+                DeadLetterQueue = dispatcherDlq,
             });
 
             StringParameter stringParameterDispatcherFunction = new(this, $"{appName}StringParameterDispatcherFunction", new StringParameterProps {
