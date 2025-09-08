@@ -166,7 +166,7 @@ namespace KairosCdk
             #region Lambda Dispatcher
             // Creación de log group lambda...
             LogGroup dispatcherLogGroup = new(this, $"{appName}DispatcherLogGroup", new LogGroupProps {
-                LogGroupName = $"/aws/lambda/{appName}DispatcherLambdaFunction/logs",
+                LogGroupName = $"/aws/lambda/{appName}Dispatcher/logs",
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
@@ -244,7 +244,7 @@ namespace KairosCdk
 
             // Creación de la función lambda...
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
-                FunctionName = $"{appName}DispatcherLambdaFunction",
+                FunctionName = $"{appName}Dispatcher",
                 Description = $"Funcion dispatcher encargada de ingresar los procesos a la cola de ejecucion de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = dispatcherHandler,
@@ -272,7 +272,7 @@ namespace KairosCdk
             #region Lambda Executor
             // Creación de log group lambda...
             LogGroup executorLogGroup = new(this, $"{appName}ExecutorLogGroup", new LogGroupProps {
-                LogGroupName = $"/aws/lambda/{appName}ExecutorLambdaFunction/logs",
+                LogGroupName = $"/aws/lambda/{appName}Executor/logs",
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
@@ -321,7 +321,7 @@ namespace KairosCdk
 
             // Creación de la función lambda...
             Function executorFunction = new(this, $"{appName}ExecutorLambdaFunction", new FunctionProps {
-                FunctionName = $"{appName}ExecutorLambdaFunction",
+                FunctionName = $"{appName}Executor",
                 Description = $"Funcion executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = executorHandler,
@@ -420,7 +420,7 @@ namespace KairosCdk
             #region API Gateway y Lambda
             // Creación de log group lambda...
             LogGroup logGroup = new(this, $"{appName}APILogGroup", new LogGroupProps {
-                LogGroupName = $"/aws/lambda/{appName}APILambdaFunction/logs",
+                LogGroupName = $"/aws/lambda/{appName}API/logs",
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
@@ -495,7 +495,7 @@ namespace KairosCdk
 
             // Creación de la función lambda...
             Function function = new(this, $"{appName}APILambdaFunction", new FunctionProps {
-                FunctionName = $"{appName}APILambdaFunction",
+                FunctionName = $"{appName}API",
                 Description = $"API encargada de programar la ejecucion de procesos de la aplicacion {appName}",
                 Runtime = Runtime.DOTNET_8,
                 Handler = apiHandler,
@@ -512,7 +512,7 @@ namespace KairosCdk
 
             // Creación de access logs...
             LogGroup logGroupAccessLogs = new(this, $"{appName}APILambdaFunctionLogGroup", new LogGroupProps {
-                LogGroupName = $"/aws/lambda/{appName}APILambdaFunction/access_logs",
+                LogGroupName = $"/aws/lambda/{appName}API/access_logs",
                 Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
