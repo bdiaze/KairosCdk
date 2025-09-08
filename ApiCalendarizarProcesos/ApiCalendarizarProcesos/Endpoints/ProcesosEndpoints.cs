@@ -69,7 +69,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     }
 
                     // Se valida si ya existe el proceso en dynamoDB, si no existe entonces se registra...
-                    string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes(entrada.Nombre)).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
+                    string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes($"{entrada.Nombre}/{entrada.ArnProceso}/{entrada.Cron}")).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
                     Dictionary<string, object?>? procesoExistente = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, object?> {
                         ["IdProceso"] = idProceso
                     });
