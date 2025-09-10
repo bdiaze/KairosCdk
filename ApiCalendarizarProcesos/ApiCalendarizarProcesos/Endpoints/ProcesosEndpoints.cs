@@ -36,7 +36,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
 
                     // Se limpia la entrada...
-                    entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ").ToUpperInvariant();
+                    entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ");
                     entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ").ToUpperInvariant();
 
                     // Se valida si existe el schedule, si no existe entonces se crea y registra en dynamoDB...
