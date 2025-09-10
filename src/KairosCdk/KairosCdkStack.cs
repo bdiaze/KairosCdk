@@ -338,8 +338,6 @@ namespace KairosCdk
 
             executorFunction.AddEventSource(new SqsEventSource(queue, new SqsEventSourceProps {
                 Enabled = true,
-                BatchSize = Math.Round(double.Parse(executorTimeout) * 5 * 0.5),
-                MaxBatchingWindow = Duration.Seconds(30),
                 ReportBatchItemFailures = true,
             }));
             #endregion
@@ -519,7 +517,7 @@ namespace KairosCdk
 
             // Creación de la LambdaRestApi...
             LambdaRestApi lambdaRestApi = new(this, $"{appName}APILambdaRestApi", new LambdaRestApiProps {
-                RestApiName = $"{appName}APILambdaRestApi",
+                RestApiName = $"{appName}API",
                 Handler = function,
                 DeployOptions = new StageOptions {
                     AccessLogDestination = new LogGroupLogDestination(logGroupAccessLogs),
@@ -554,7 +552,7 @@ namespace KairosCdk
 
             // Se crea API Key...
             ApiKey apiGatewayKey = new(this, $"{appName}APIAPIKey", new ApiKeyProps {
-                ApiKeyName = $"{appName}APIAPIKey",
+                ApiKeyName = $"{appName}APIKey",
                 Description = $"API Key de {appName} API",
             });
             usagePlan.AddApiKey(apiGatewayKey);
