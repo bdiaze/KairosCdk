@@ -167,6 +167,7 @@ namespace KairosCdk
             // Creación de log group lambda...
             LogGroup dispatcherLogGroup = new(this, $"{appName}DispatcherLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}Dispatcher/logs",
+                Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
@@ -273,6 +274,7 @@ namespace KairosCdk
             // Creación de log group lambda...
             LogGroup executorLogGroup = new(this, $"{appName}ExecutorLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}Executor/logs",
+                Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
@@ -419,6 +421,7 @@ namespace KairosCdk
             // Creación de log group lambda...
             LogGroup logGroup = new(this, $"{appName}APILogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}API/logs",
+                Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
