@@ -16,8 +16,14 @@ using Amazon.CDK.AWS.SSM;
 using Constructs;
 using System;
 using System.Collections.Generic;
+using ApiKey = Amazon.CDK.AWS.APIGateway.ApiKey;
+using ApiKeyProps = Amazon.CDK.AWS.APIGateway.ApiKeyProps;
 using Attribute = Amazon.CDK.AWS.DynamoDB.Attribute;
+using LogGroupLogDestination = Amazon.CDK.AWS.APIGateway.LogGroupLogDestination;
 using StageOptions = Amazon.CDK.AWS.APIGateway.StageOptions;
+using UsagePlan = Amazon.CDK.AWS.APIGateway.UsagePlan;
+using UsagePlanPerApiStage = Amazon.CDK.AWS.APIGateway.UsagePlanPerApiStage;
+using UsagePlanProps = Amazon.CDK.AWS.APIGateway.UsagePlanProps;
 
 namespace KairosCdk
 {
@@ -247,7 +253,7 @@ namespace KairosCdk
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}Dispatcher",
                 Description = $"Funcion dispatcher encargada de ingresar los procesos a la cola de ejecucion de la aplicacion {appName}",
-                Runtime = Runtime.DOTNET_8,
+                Runtime = Runtime.DOTNET_10,
                 Handler = dispatcherHandler,
                 Code = Code.FromAsset($"{dispatcherDirectory}/publish/publish.zip"),
                 Timeout = Duration.Seconds(double.Parse(dispatcherTimeout)),
@@ -325,7 +331,7 @@ namespace KairosCdk
             Function executorFunction = new(this, $"{appName}ExecutorLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}Executor",
                 Description = $"Funcion executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
-                Runtime = Runtime.DOTNET_8,
+                Runtime = Runtime.DOTNET_10,
                 Handler = executorHandler,
                 Code = Code.FromAsset($"{executorDirectory}/publish/publish.zip"),
                 Timeout = Duration.Seconds(double.Parse(executorTimeout)),
@@ -498,7 +504,7 @@ namespace KairosCdk
             Function function = new(this, $"{appName}APILambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}API",
                 Description = $"API encargada de programar la ejecucion de procesos de la aplicacion {appName}",
-                Runtime = Runtime.DOTNET_8,
+                Runtime = Runtime.DOTNET_10,
                 Handler = apiHandler,
                 Code = Code.FromAsset($"{apiDirectory}/publish/publish.zip"),
                 Timeout = Duration.Seconds(double.Parse(apiTimeout)),
