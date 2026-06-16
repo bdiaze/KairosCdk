@@ -28,7 +28,7 @@ namespace LambdaDispatcher.Helpers {
                 throw new Exception("Ocurrió un error al obtener por índice los ítems de Dynamo");
             }
 
-            return [.. response.Items.Select(i => ToDict(i))];
+            return [.. response.Items.Where(i => i != null).Select(i => ToDict(i)!)];
         }
 
         public static string ToJson(Dictionary<string, AttributeValue> item) {
@@ -41,7 +41,7 @@ namespace LambdaDispatcher.Helpers {
             return JsonSerializer.Serialize(dict);
         }
 
-        private static Dictionary<string, object?>? ToDict(Dictionary<string, AttributeValue> item) {
+        private static Dictionary<string, object?>? ToDict(Dictionary<string, AttributeValue>? item) {
             if (item == null) return null;
 
             Dictionary<string, object?> dict = [];
