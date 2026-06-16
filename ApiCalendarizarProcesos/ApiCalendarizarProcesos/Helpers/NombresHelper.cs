@@ -96,12 +96,7 @@ namespace ApiCalendarizarProcesos.Helpers {
 			// Se reemplazan secuencias de caracteres repetidos...
 			nombre = Regex.Replace(nombre, @"[-_.]{2,}", "-");
 
-			return $"proceso-{nombre.ToLowerInvariant().Trim('-', '.', '_')}-{Guid.NewGuid():N}";
+			return $"proceso-{nombre.ToLowerInvariant().Trim('-', '.', '_')}";
 		}
-
-		/*
-		string idProceso = $"proceso-{Convert.ToBase64String(Encoding.UTF8.GetBytes($"{entrada.Nombre}/{entrada.ArnProceso}/{entrada.Cron}")).Replace("+", "-").Replace("/", "_").Replace("=", ".")}";
-                    
-		*/
 	}
 }
