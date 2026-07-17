@@ -37,45 +37,58 @@ namespace ApiCalendarizarProcesos.Helpers {
 			{"12","dic"}
 		};
 
-		public static string GenerarNombreCalendarizacion(string cron) {
-			string[] parts = cron.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length != 6) throw new ArgumentException("Cron inválido");
-
-			string min		= parts[0];
-			string hour		= parts[1];
-			string day		= parts[2];
-			string month	= parts[3];
-			string weekday	= parts[4];
-			string year		= parts[5];
+		public static string GenerarNombreCalendarizacion(string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
+			if ((cron == null && frecuenciaDias == null) || (cron != null && frecuenciaDias != null)) 
+				throw new InvalidOperationException("Se debe definir una configuración cron o frecuencia en días.");
 
 			List<string> segments = [];
-			if (day != "*" && day != "?")
-				segments.Add("dia" + day.Replace(",", "."));
-			
-			if (month != "*" && month != "?") {
-				string[] mesesTexto = [.. month
+			if (inicioEjecucionUtc != null) {
+				TimeZoneInfo timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("America/Santiago");
+				DateTime inicioEjecucionChile = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(inicioEjecucionUtc.Value, DateTimeKind.Utc), timeZoneInfo);
+				segments.Add("inicio" + inicioEjecucionChile.ToString("dd.MM.yyyy.HH.mm"));
+			}
+
+			if (cron != null) {
+				string[] parts = cron.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+				if (parts.Length != 6) throw new ArgumentException("Cron inválido");
+
+				string min = parts[0];
+				string hour = parts[1];
+				string day = parts[2];
+				string month = parts[3];
+				string weekday = parts[4];
+				string year = parts[5];
+
+				if (day != "*" && day != "?")
+					segments.Add("dia" + day.Replace(",", "."));
+
+				if (month != "*" && month != "?") {
+					string[] mesesTexto = [.. month
 					.Split(',')
 					.Select(m => mapMeses.TryGetValue(m.Trim(), out string? nombre) ? nombre : m.Trim())
-				];
-				segments.Add("meses." + string.Join(".", mesesTexto));
-			}
+					];
+					segments.Add("meses." + string.Join(".", mesesTexto));
+				}
 
-			if (year != "*" && year != "?")
-				segments.Add("anno" + year);
+				if (year != "*" && year != "?")
+					segments.Add("anno" + year);
 
-			if (weekday != "*" && weekday != "?") {
-				string[] diasTexto = [.. weekday.ToUpperInvariant()
+				if (weekday != "*" && weekday != "?") {
+					string[] diasTexto = [.. weekday.ToUpperInvariant()
 					.Split(',')
 					.Select(d => mapDias.TryGetValue(d.Trim(), out string? nombre) ? nombre : d.Trim())
-				];
-				segments.Add("dias." + string.Join(".", diasTexto));
+					];
+					segments.Add("dias." + string.Join(".", diasTexto));
+				}
+
+				string horaTexto = hour.StartsWith("*/") ? $"cada{hour[2..]}h" : $"{hour.Replace("*", "X")}h";
+				string minTexto = min.StartsWith("*/") ? $"cada{min[2..]}min" : $"{min.Replace("*", "X")}min";
+
+				segments.Add(horaTexto);
+				segments.Add(minTexto);
+			} else if (frecuenciaDias != null) {
+				segments.Add($"cada{frecuenciaDias}dias");
 			}
-
-			string horaTexto = hour.StartsWith("*/") ? $"cada{hour[2..]}h" : $"{hour.Replace("*", "X")}h";
-			string minTexto = min.StartsWith("*/") ? $"cada{min[2..]}min" : $"{min.Replace("*", "X")}min";
-
-			segments.Add(horaTexto);
-			segments.Add(minTexto);
 
 			string nombre = "calendarizacion-" + string.Join("-", segments);
 			nombre = Regex.Replace(nombre, @"[^a-zA-Z0-9\-._]", ".");

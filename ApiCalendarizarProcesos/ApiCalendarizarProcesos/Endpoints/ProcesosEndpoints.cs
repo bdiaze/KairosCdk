@@ -37,17 +37,50 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
                     // Se limpia la entrada...
                     entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ");
-                    entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ").ToUpperInvariant();
+                    if (entrada.Cron != null) entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ").ToUpperInvariant();
+
+                    // Se valida que venga cron o frecuencia en días (no ambos al mismo tiempo)...
+                    if ((entrada.Cron == null && entrada.FrecuenciaDias == null) || (entrada.Cron != null && entrada.FrecuenciaDias != null)) {
+						LambdaLogger.Log(
+						    $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+						    $"Se debe indicar una configuración cron o una frecuencia en días.");
+						return Results.BadRequest("Se debe indicar una configuración cron o una frecuencia en días.");
+					}
+
+                    // Se valida que si viene frecuencia en días, también se incluya el inicio de las ejecuciones...
+                    if (entrada.FrecuenciaDias != null && entrada.InicioEjecucionUtc == null) {
+						LambdaLogger.Log(
+							$"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+							$"Junto con indicar la frecuencia en días, se debe indicar la fecha en que inicia la ejecución del proceso.");
+						return Results.BadRequest("Junto con indicar la frecuencia en días, se debe indicar la fecha en que inicia la ejecución del proceso.");
+					}
+
+                    // Se valida que la fecha de inicio de ejecución sea futura...
+                    if (entrada.InicioEjecucionUtc != null && entrada.InicioEjecucionUtc <= DateTime.UtcNow) {
+                        LambdaLogger.Log(
+                            $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+                            $"La fecha de inicio de ejecución debe ser una fecha futura.");
+                        return Results.BadRequest("La fecha de inicio de ejecución debe ser una fecha futura.");
+					}
 
                     // Se valida si existe el schedule, si no existe entonces se crea y registra en dynamoDB...
-                    string idCalendarizacion = $"{NombresHelper.GenerarNombreCalendarizacion(entrada.Cron)}";
+                    string idCalendarizacion = $"{NombresHelper.GenerarNombreCalendarizacion(entrada.Cron, entrada.FrecuenciaDias, entrada.InicioEjecucionUtc)}";
                     Schedule? scheduleExistente = await scheduler.Obtener(idCalendarizacion, nombreScheduleGroup);
                     if (scheduleExistente == null) {
+                        string descripcionInicio = "";
+                        if (entrada.InicioEjecucionUtc != null) {
+							TimeZoneInfo timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("America/Santiago");
+							DateTime inicioEjecucionChile = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(entrada.InicioEjecucionUtc.Value, DateTimeKind.Utc), timeZoneInfo);
+                            descripcionInicio = $"start_date({inicioEjecucionChile:yyyy.MM.dd HH.mm}) - ";
+						}
+                        string descripcionFrecuencia = entrada.Cron != null ? $"cron({entrada.Cron})" : $"rate({entrada.FrecuenciaDias} days)";
                         scheduleExistente = await scheduler.Crear(
                             idCalendarizacion, 
-                            $"Calendarizacion de {nombreAplicacion} para cron({entrada.Cron})", 
+                            $"Calendarizacion de {nombreAplicacion} para {descripcionInicio}{descripcionFrecuencia}", 
                             nombreScheduleGroup, 
                             entrada.Cron,
+                            entrada.FrecuenciaDias,
+                            entrada.InicioEjecucionUtc,
                             arnRoleSchedule,
                             arnDlqSchedule,
                             arnLambdaDispatcher,
@@ -62,7 +95,9 @@ namespace ApiCalendarizarProcesos.Endpoints {
                                 ["Descripcion"] = scheduleExistente.Descripcion,
                                 ["Grupo"] = scheduleExistente.Grupo,
                                 ["Cron"] = scheduleExistente.Cron,
-                                ["Arn"] = scheduleExistente.Arn,
+								["FrecuenciaDias"] = scheduleExistente.FrecuenciaDias,
+								["InicioEjecucion"] = scheduleExistente.InicioEjecucionUtc?.ToString("O"),
+								["Arn"] = scheduleExistente.Arn,
                                 ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
                             });
                         }

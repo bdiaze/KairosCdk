@@ -6,12 +6,23 @@ using System.Threading.Tasks;
 
 namespace ApiCalendarizarProcesos.Helpers {
     public class SchedulerHelper(IAmazonScheduler client) {
-        public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string cron, string roleArn, string dlqArn, string targetArn, string targetInput) {
-            CreateScheduleRequest request = new() {
+        public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc, string roleArn, string dlqArn, string targetArn, string targetInput) {
+			if ((cron == null && frecuenciaDias == null) || (cron != null && frecuenciaDias != null))
+				throw new InvalidOperationException("Se debe definir una configuración cron o frecuencia en días.");
+
+            string scheduleExpression;
+            if (cron != null) {
+                scheduleExpression = $"cron({cron})";
+            } else {
+                scheduleExpression = $"rate({frecuenciaDias} days)";
+            }
+
+			CreateScheduleRequest request = new() {
                 Name = nombre,
                 Description = descripcion,
                 GroupName = grupo,
-                ScheduleExpression = $"cron({cron})",
+                ScheduleExpression = scheduleExpression,
+                StartDate = inicioEjecucionUtc,
                 FlexibleTimeWindow = new FlexibleTimeWindow { 
                     Mode = FlexibleTimeWindowMode.OFF
                 },
@@ -63,12 +74,23 @@ namespace ApiCalendarizarProcesos.Helpers {
                     throw new Exception("No se pudo obtener el schedule");
                 }
 
+                string? cron = null;
+                if (response.ScheduleExpression.Contains("cron(")) {
+                    cron = response.ScheduleExpression.Replace("cron(", "").Replace(")", "");
+				}
+                int? frecuenciaDias = null;
+                if (response.ScheduleExpression.Contains("rate(") && response.ScheduleExpression.Contains("days)")) {
+                    frecuenciaDias = Convert.ToInt32(response.ScheduleExpression.Replace("rate(", "").Replace("days)", ""));
+                }
+
                 return new Schedule {
                     Nombre = response.Name,
                     Descripcion = response.Description,
                     Grupo = response.GroupName,
-                    Cron = response.ScheduleExpression.Replace("cron(", "").Replace(")", ""),
-                    Arn = response.Arn,
+                    Cron = cron,
+                    FrecuenciaDias = frecuenciaDias,
+					InicioEjecucionUtc = response.StartDate,
+					Arn = response.Arn,
                 };
             } catch (ResourceNotFoundException) {
                 return null;
