@@ -1,4 +1,4 @@
-using Amazon.Lambda;
+﻿using Amazon.Lambda;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.Model;
 using Amazon.Lambda.SQSEvents;
@@ -82,7 +82,7 @@ public class Function
                     $"Se procedera a procesar el mensaje de la cola - Message ID: {mensaje.MessageId}.");
 
                 if (proceso.TryGetValue("ArnRol", out object? arnRole) && proceso.TryGetValue("ArnProceso", out object? arnProceso) && proceso.TryGetValue("Parametros", out object? parametros)) {
-                    // Si no viene el ARN del role o del proceso a gatillar, se omite la ejecuci�n...
+                    // Si no viene el ARN del role o del proceso a gatillar, se omite la ejecución...
                     if (arnRole == null || arnProceso == null) {
                         throw new Exception("El atributo ArnRol o ArnProceso no puede ser nulo.");
                     }

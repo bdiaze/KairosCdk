@@ -1,4 +1,4 @@
-using Amazon.CDK;
+锘縰sing Amazon.CDK;
 using Amazon.CDK.AWS.APIGateway;
 using Amazon.CDK.AWS.Apigatewayv2;
 using Amazon.CDK.AWS.CloudWatch;
@@ -127,7 +127,7 @@ namespace KairosCdk
             #endregion
 
             #region SQS
-            // Creaci髇 de cola...
+            // Creaci贸n de cola...
             Queue dlq = new(this, $"{appName}DeadLetterQueue", new QueueProps {
                 QueueName = $"{appName}DeadLetterQueue",
                 RetentionPeriod = Duration.Days(14),
@@ -145,7 +145,7 @@ namespace KairosCdk
                 },
             });
 
-            // Se crea alarma para enviar notificaci髇 cuando llegue un elemento al DLQ...
+            // Se crea alarma para enviar notificaci贸n cuando llegue un elemento al DLQ...
             Alarm alarm = new(this, $"{appName}DeadLetterQueueAlarm", new AlarmProps {
                 AlarmName = $"{appName}DeadLetterQueueAlarm",
                 AlarmDescription = $"Alarma para notificar cuando llega algun elemento a la DLQ de {appName}",
@@ -170,14 +170,14 @@ namespace KairosCdk
             #endregion
 
             #region Lambda Dispatcher
-            // Creaci髇 de log group lambda...
+            // Creaci贸n de log group lambda...
             LogGroup dispatcherLogGroup = new(this, $"{appName}DispatcherLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}Dispatcher/logs",
                 Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
-            // Creaci髇 de role para la funci髇 lambda...
+            // Creaci贸n de role para la funci贸n lambda...
             Role roleDispatcherLambda = new(this, $"{appName}DispatcherLambdaRole", new RoleProps {
                 RoleName = $"{appName}DispatcherLambdaRole",
                 Description = $"Role para Lambda dispatcher de {appName}",
@@ -226,14 +226,14 @@ namespace KairosCdk
                 }
             });
 
-            // Creaci髇 de una DLQ con su respectivo Alarm...
+            // Creaci贸n de una DLQ con su respectivo Alarm...
             Queue dispatcherDlq = new(this, $"{appName}DispatcherDeadLetterQueue", new QueueProps {
                 QueueName = $"{appName}DispatcherDeadLetterQueue",
                 RetentionPeriod = Duration.Days(14),
                 EnforceSSL = true
             });
 
-            // Se crea alarma para enviar notificaci髇 cuando llegue un elemento al DLQ...
+            // Se crea alarma para enviar notificaci贸n cuando llegue un elemento al DLQ...
             Alarm dispatcherAlarm = new(this, $"{appName}DispatcherDeadLetterQueueAlarm", new AlarmProps {
                 AlarmName = $"{appName}DispatcherDeadLetterQueueAlarm",
                 AlarmDescription = $"Alarma para notificar cuando llega algun elemento a la Dispatcher DLQ de {appName}",
@@ -249,7 +249,7 @@ namespace KairosCdk
             });
             dispatcherAlarm.AddAlarmAction(new SnsAction(topic));
 
-            // Creaci髇 de la funci髇 lambda...
+            // Creaci贸n de la funci贸n lambda...
             Function dispatcherFunction = new(this, $"{appName}DispatcherLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}Dispatcher",
                 Description = $"Funcion dispatcher encargada de ingresar los procesos a la cola de ejecucion de la aplicacion {appName}",
@@ -277,14 +277,14 @@ namespace KairosCdk
             #endregion
 
             #region Lambda Executor
-            // Creaci髇 de log group lambda...
+            // Creaci贸n de log group lambda...
             LogGroup executorLogGroup = new(this, $"{appName}ExecutorLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}Executor/logs",
                 Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
-            // Creaci髇 de role para la funci髇 lambda...
+            // Creaci贸n de role para la funci贸n lambda...
             Role roleExecutorLambda = new(this, $"{appName}ExecutorLambdaRole", new RoleProps {
                 RoleName = $"{appName}ExecutorLambdaRole",
                 Description = $"Role para Lambda executor de {appName}",
@@ -327,7 +327,7 @@ namespace KairosCdk
                 Tier = ParameterTier.STANDARD,
             });
 
-            // Creaci髇 de la funci髇 lambda...
+            // Creaci贸n de la funci贸n lambda...
             Function executorFunction = new(this, $"{appName}ExecutorLambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}Executor",
                 Description = $"Funcion executor encargada de ejecutar los procesos desde la cola de la aplicacion {appName}",
@@ -351,7 +351,7 @@ namespace KairosCdk
             #endregion
 
             #region DLQ y Role para Scheduler
-            // Creaci髇 de cola...
+            // Creaci贸n de cola...
             Queue schedulerDlq = new(this, $"{appName}ScheduleDeadLetterQueue", new QueueProps {
                 QueueName = $"{appName}ScheduleDeadLetterQueue",
                 RetentionPeriod = Duration.Days(14),
@@ -365,7 +365,7 @@ namespace KairosCdk
                 Tier = ParameterTier.STANDARD,
             });
                         
-            // Se crea alarma para enviar notificaci髇 cuando llegue un elemento al DLQ...
+            // Se crea alarma para enviar notificaci贸n cuando llegue un elemento al DLQ...
             Alarm alarmScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueAlarm", new AlarmProps {
                 AlarmName = $"{appName}ScheduleDeadLetterQueueAlarm",
                 AlarmDescription = $"Alarma para notificar cuando llega algun elemento al Schedule DLQ de {appName}",
@@ -381,7 +381,7 @@ namespace KairosCdk
             });
             alarmScheduleDlq.AddAlarmAction(new SnsAction(topic));
 
-            // Creaci髇 de role usado por Scheduler para gatillar dispatcher lambda...
+            // Creaci贸n de role usado por Scheduler para gatillar dispatcher lambda...
             Role roleScheduler = new(this, $"{appName}SchedulerRole", new RoleProps {
                 RoleName = $"{appName}SchedulerRole",
                 Description = $"Role para Scheduler de {appName}",
@@ -424,14 +424,14 @@ namespace KairosCdk
             #endregion
 
             #region API Gateway y Lambda
-            // Creaci髇 de log group lambda...
+            // Creaci贸n de log group lambda...
             LogGroup logGroup = new(this, $"{appName}APILogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}API/logs",
                 Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
-            // Creaci髇 de role para la funci髇 lambda...
+            // Creaci贸n de role para la funci贸n lambda...
             Role roleLambda = new(this, $"{appName}APILambdaRole", new RoleProps {
                 RoleName = $"{appName}APILambdaRole",
                 Description = $"Role para API Lambda de {appName}",
@@ -500,7 +500,7 @@ namespace KairosCdk
                 }
             });
 
-            // Creaci髇 de la funci髇 lambda...
+            // Creaci贸n de la funci贸n lambda...
             Function function = new(this, $"{appName}APILambdaFunction", new FunctionProps {
                 FunctionName = $"{appName}API",
                 Description = $"API encargada de programar la ejecucion de procesos de la aplicacion {appName}",
@@ -517,14 +517,14 @@ namespace KairosCdk
                 Role = roleLambda,
             });
 
-            // Creaci髇 de access logs...
+            // Creaci贸n de access logs...
             LogGroup logGroupAccessLogs = new(this, $"{appName}APILambdaFunctionLogGroup", new LogGroupProps {
                 LogGroupName = $"/aws/lambda/{appName}API/access_logs",
                 Retention = RetentionDays.ONE_MONTH,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
 
-            // Creaci髇 de la LambdaRestApi...
+            // Creaci贸n de la LambdaRestApi...
             LambdaRestApi lambdaRestApi = new(this, $"{appName}APILambdaRestApi", new LambdaRestApiProps {
                 RestApiName = $"{appName}API",
                 Handler = function,
@@ -539,7 +539,7 @@ namespace KairosCdk
                 },
             });
 
-            // Creaci髇 de la CfnApiMapping para el API Gateway...
+            // Creaci贸n de la CfnApiMapping para el API Gateway...
             CfnApiMapping apiMapping = new(this, $"{appName}APIApiMapping", new CfnApiMappingProps {
                 DomainName = apiDomainName,
                 ApiMappingKey = apiMappingKey,
@@ -566,7 +566,7 @@ namespace KairosCdk
             });
             usagePlan.AddApiKey(apiGatewayKey);
 
-            // Se configura permisos para la ejecuc韔n de la Lambda desde el API Gateway...
+            // Se configura permisos para la ejecuc铆on de la Lambda desde el API Gateway...
             ArnPrincipal arnPrincipal = new("apigateway.amazonaws.com");
             Permission permission = new() {
                 Scope = this,
@@ -576,7 +576,7 @@ namespace KairosCdk
             };
             function.AddPermission($"{appName}APIPermission", permission);
 
-            // Se configuran par醡etros para ser rescatados por consumidores...
+            // Se configuran par谩metros para ser rescatados por consumidores...
             _ = new StringParameter(this, $"{appName}StringParameterApiUrl", new StringParameterProps {
                 ParameterName = $"/{appName}/Api/Url",
                 Description = $"API URL de la aplicacion {appName}",
