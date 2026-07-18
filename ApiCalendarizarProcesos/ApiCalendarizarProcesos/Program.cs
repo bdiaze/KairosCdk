@@ -31,4 +31,4 @@ var app = builder.Build();
 
 app.MapProcesosEndpoints();
 
-app.Run();
+await app.RunAsync();

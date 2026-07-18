@@ -36,8 +36,8 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
 
                     // Se limpia la entrada...
-                    entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ");
-                    if (entrada.Cron != null) entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ").ToUpperInvariant();
+                    entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ", RegexOptions.NonBacktracking);
+                    if (entrada.Cron != null) entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ", RegexOptions.NonBacktracking).ToUpperInvariant();
 
                     // Se valida que venga cron o frecuencia en días (no ambos al mismo tiempo)...
                     if ((entrada.Cron == null && entrada.FrecuenciaDias == null) || (entrada.Cron != null && entrada.FrecuenciaDias != null)) {

@@ -91,7 +91,7 @@ namespace ApiCalendarizarProcesos.Helpers {
 			}
 
 			string nombre = "calendarizacion-" + string.Join("-", segments);
-			nombre = Regex.Replace(nombre, @"[^a-zA-Z0-9\-._]", ".");
+			nombre = Regex.Replace(nombre, @"[^a-zA-Z0-9\-._]", ".", RegexOptions.NonBacktracking);
 			return nombre.Length > 64 ? nombre[..64] : nombre;
 		}
 
@@ -105,9 +105,9 @@ namespace ApiCalendarizarProcesos.Helpers {
 			// Se reemplazan espacios...
 			nombre = nombre.Replace(" ", "-");
 			// Se eliminan caracteres no permitidos...
-			nombre = Regex.Replace(nombre, @"[^a-zA-Z0-9\-._]", "");
+			nombre = Regex.Replace(nombre, @"[^a-zA-Z0-9\-._]", "", RegexOptions.NonBacktracking);
 			// Se reemplazan secuencias de caracteres repetidos...
-			nombre = Regex.Replace(nombre, @"[-_.]{2,}", "-");
+			nombre = Regex.Replace(nombre, @"[-_.]{2,}", "-", RegexOptions.NonBacktracking);
 
 			return $"proceso-{nombre.ToLowerInvariant().Trim('-', '.', '_')}";
 		}
