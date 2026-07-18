@@ -66,11 +66,18 @@ jobs:
                   /o:"${{ vars.SONAR_ORGANIZATION_KEY }}" \
                   /d:sonar.token="$SONAR_TOKEN" \
                   /d:sonar.sourceEncoding="UTF-8" \
+                  /d:sonar.cs.vstest.reportsPaths="**/*.trx" \
+                  /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" \
                   /d:sonar.exclusions="**/*.jpeg,**/*.jpg,**/*.png,**/*.ico"
                   
             - name: Build
               run: | 
                 dotnet build --configuration Release --no-restore
+                
+            - name: Test con coverage
+              working-directory: ${{ vars.AOT_MINIMAL_API_TEST_DIRECTORY }}
+              run: |
+                dotnet test --configuration Release --no-build --settings coverlet.runsettings --logger "trx"
                 
             - name: Sonar End
               env:
