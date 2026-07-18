@@ -1,11 +1,12 @@
 ﻿using Amazon.Lambda.APIGatewayEvents;
 using ApiCalendarizarProcesos.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace ApiCalendarizarProcesos.Helpers {
-
-    [JsonSerializable(typeof(APIGatewayProxyRequest))]
+	[ExcludeFromCodeCoverage]
+	[JsonSerializable(typeof(APIGatewayProxyRequest))]
     [JsonSerializable(typeof(APIGatewayProxyResponse))]
     [JsonSerializable(typeof(ProblemDetails))]
     [JsonSerializable(typeof(EntIngresarProceso))]

@@ -1,8 +1,9 @@
 ﻿using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
+using ApiCalendarizarProcesos.Interfaces.Helpers;
 
 namespace ApiCalendarizarProcesos.Helpers {
-    public class ParameterStoreHelper(IAmazonSimpleSystemsManagement client) {
+    public class ParameterStoreHelper(IAmazonSimpleSystemsManagement client) : IParameterStoreHelper {
 
         private readonly Dictionary<string, string> parametersValues = [];
 

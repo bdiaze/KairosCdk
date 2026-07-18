@@ -4,6 +4,7 @@ using Amazon.Scheduler;
 using Amazon.SimpleSystemsManagement;
 using ApiCalendarizarProcesos.Endpoints;
 using ApiCalendarizarProcesos.Helpers;
+using ApiCalendarizarProcesos.Interfaces.Helpers;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -21,10 +22,10 @@ builder.Services.AddSingleton<IAmazonScheduler, AmazonSchedulerClient>();
 #endregion
 
 #region Singleton Helpers
-builder.Services.AddSingleton<VariableEntornoHelper>();
-builder.Services.AddSingleton<ParameterStoreHelper>();
-builder.Services.AddSingleton<SchedulerHelper>();
-builder.Services.AddSingleton<DynamoHelper>();
+builder.Services.AddSingleton<IVariableEntornoHelper, VariableEntornoHelper>();
+builder.Services.AddSingleton<IParameterStoreHelper, ParameterStoreHelper>();
+builder.Services.AddSingleton<ISchedulerHelper, SchedulerHelper>();
+builder.Services.AddSingleton<IDynamoHelper, DynamoHelper>();
 #endregion
 
 var app = builder.Build();

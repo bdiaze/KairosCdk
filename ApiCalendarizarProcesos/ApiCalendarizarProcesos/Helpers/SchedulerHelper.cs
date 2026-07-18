@@ -1,11 +1,11 @@
 ﻿using Amazon.Scheduler;
 using Amazon.Scheduler.Model;
+using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
 using System.Net;
-using System.Threading.Tasks;
 
 namespace ApiCalendarizarProcesos.Helpers {
-    public class SchedulerHelper(IAmazonScheduler client) {
+    public class SchedulerHelper(IAmazonScheduler client) : ISchedulerHelper {
         public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc, string roleArn, string dlqArn, string targetArn, string targetInput) {
 			if ((cron == null && frecuenciaDias == null) || (cron != null && frecuenciaDias != null))
 				throw new InvalidOperationException("Se debe definir una configuración cron o frecuencia en días.");

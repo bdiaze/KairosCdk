@@ -1,12 +1,11 @@
 ﻿using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using ApiCalendarizarProcesos.Interfaces.Helpers;
+using System.Collections;
 using System.Globalization;
-using System.Text.Json;
 
 namespace ApiCalendarizarProcesos.Helpers {
-    public class DynamoHelper(IAmazonDynamoDB client) {
+    public class DynamoHelper(IAmazonDynamoDB client) : IDynamoHelper {
 
         public async Task<Dictionary<string, object?>?> Insertar(string nombreTabla, Dictionary<string, object?> item) {
             PutItemRequest request = new() {
@@ -15,9 +14,9 @@ namespace ApiCalendarizarProcesos.Helpers {
             };
 
             PutItemResponse response = await client.PutItemAsync(request);
-
+            
             if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
-                throw new Exception("Ocurrió un error al insertar el ítem de Dynamo");
+                throw new HttpRequestException("Ocurrió un error al insertar el ítem de Dynamo");
             }
 
             return item;
@@ -69,17 +68,7 @@ namespace ApiCalendarizarProcesos.Helpers {
                 throw new Exception("Ocurrió un error al eliminar el ítem de Dynamo");
             }
         }
-
-        public static string ToJson(Dictionary<string, AttributeValue> item) {
-            Dictionary<string, object?> dict = [];
-
-            foreach (KeyValuePair<string, AttributeValue> kvp in item) {
-                dict[kvp.Key] = ConvertAttributeValue(kvp.Value);
-            }
-
-            return JsonSerializer.Serialize(dict!, AppJsonSerializerContext.Default.IDictionaryStringObject);
-        }
-
+                
         private static Dictionary<string, object?>? ToDict(Dictionary<string, AttributeValue>? item) {
             if (item == null) return null;
 
@@ -96,11 +85,15 @@ namespace ApiCalendarizarProcesos.Helpers {
             if (av.S != null) return av.S;
 
             if (av.N != null) {
-                if (long.TryParse(av.N, out var intValue)) {
+                if (int.TryParse(av.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue)) {
                     return intValue;
+
                 }
-                if (double.TryParse(av.N, out var doubleValue)) {
-                    return doubleValue;
+                if (long.TryParse(av.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue)) {
+                    return longValue;
+                }
+                if (decimal.TryParse(av.N, NumberStyles.Number, CultureInfo.InvariantCulture, out var decimalValue)) {
+                    return decimalValue;
                 }
                 return av.N;
             }
@@ -145,9 +138,9 @@ namespace ApiCalendarizarProcesos.Helpers {
                 double d => new AttributeValue { N = d.ToString(CultureInfo.InvariantCulture) },
                 float f => new AttributeValue { N = f.ToString(CultureInfo.InvariantCulture) },
                 bool b => new AttributeValue { BOOL = b },
-                IEnumerable<object> list => new AttributeValue { L = [.. list.Select(ToAttributeValue)] },
                 Dictionary<string, object?> map => new AttributeValue { M = ToAttributeMap(map) },
-                _ => new AttributeValue { S = value.ToString() }
+				IEnumerable list => new AttributeValue { L = [.. list.Cast<object?>().Select(ToAttributeValue)] },
+				_ => new AttributeValue { S = value.ToString() }
             };
         }
     }

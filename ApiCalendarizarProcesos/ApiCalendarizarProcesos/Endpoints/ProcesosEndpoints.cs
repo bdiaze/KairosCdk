@@ -4,6 +4,7 @@ using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
 using Amazon.Scheduler;
 using ApiCalendarizarProcesos.Helpers;
+using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
 using System.Diagnostics;
 using System.Globalization;
@@ -22,7 +23,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapPostEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapPost("/", async (EntIngresarProceso entrada, VariableEntornoHelper variableEntorno, ParameterStoreHelper parameterStore, SchedulerHelper scheduler, DynamoHelper dynamo) => {
+            routes.MapPost("/", async (EntIngresarProceso entrada, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
@@ -137,7 +138,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapDelete("/{idProceso}", async (string idProceso, VariableEntornoHelper variableEntorno, ParameterStoreHelper parameterStore, SchedulerHelper scheduler, DynamoHelper dynamo) => {
+            routes.MapDelete("/{idProceso}", async (string idProceso, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
