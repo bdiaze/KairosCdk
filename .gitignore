@@ -342,3 +342,4 @@ ASALocalRun/
 # End of https://www.gitignore.io/api/csharp
 
 appsettings.Development.json
+coverage/
