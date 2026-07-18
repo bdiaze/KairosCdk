@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ApiCalendarizarProcesos/ApiCalendarizarProcesos/ApiCalendarizarProcesos.csproj" />
+  <Project Path="LambdaDispatcher/LambdaDispatcher/LambdaDispatcher.csproj" />
+  <Project Path="LambdaExecutor/LambdaExecutor/LambdaExecutor.csproj" />
+  <Project Path="src/KairosCdk/KairosCdk.csproj" />
+</Solution>
