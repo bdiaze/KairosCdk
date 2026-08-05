@@ -476,8 +476,9 @@ namespace KairosCdk
                                         "dynamodb:PutItem",
                                         "dynamodb:DeleteItem",
                                         "dynamodb:GetItem",
-                                        "dynamodb:Query"
-                                    ],
+                                        "dynamodb:Query",
+										"dynamodb:Scan"
+									],
                                     Resources = [
                                         tablaProcesos.TableArn,
                                         $"{tablaProcesos.TableArn}/*",
