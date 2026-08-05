@@ -290,7 +290,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
 						return Results.File(
                             csv,
                             "text/csv",
-                            $"Procesos_{Guid.NewGuid()}.csv"
+                            $"Calendarizaciones_{Guid.NewGuid()}.csv"
                         );
                     }
 
