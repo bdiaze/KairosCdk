@@ -225,7 +225,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
                             return p.TryGetValue("Nombre", out object? nombre) &&
                                    nombre is string nombreTexto &&
-                                   nombreTexto.StartsWith(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+                                   nombreTexto.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
                         })
                     ];
 
@@ -275,7 +275,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
 							return p.TryGetValue("Nombre", out object? nombre) &&
 								   nombre is string nombreTexto &&
-								   nombreTexto.StartsWith(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+								   nombreTexto.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
 						})
 					];
 
