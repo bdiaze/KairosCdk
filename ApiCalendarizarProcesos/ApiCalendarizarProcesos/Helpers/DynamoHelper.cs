@@ -37,6 +37,24 @@ namespace ApiCalendarizarProcesos.Helpers {
             return ToDict(response.Item);
         }
 
+        public async Task<List<Dictionary<string, object?>>> ObtenerTodos(string nombreTabla) {
+            List<Dictionary<string, object?>> items = [];
+			Dictionary<string, AttributeValue>? lastKey = null;
+
+            do {
+                ScanResponse response = await client.ScanAsync(new ScanRequest {
+                    TableName = nombreTabla,
+                    ExclusiveStartKey = lastKey
+                });
+
+                items.AddRange(response.Items.Select(i => ToDict(i)!));
+                lastKey = response.LastEvaluatedKey;
+
+            } while (lastKey?.Count > 0);
+
+            return items;
+		}
+
         public async Task<List<Dictionary<string, object?>>> ObtenerPorIndice(string nombreTabla, string nombreIndice, string nombreCampo, string valorCampo) {
             QueryRequest request = new() {
                 TableName = nombreTabla,

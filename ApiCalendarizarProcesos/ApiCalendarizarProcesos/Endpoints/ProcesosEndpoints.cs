@@ -6,6 +6,7 @@ using Amazon.Scheduler;
 using ApiCalendarizarProcesos.Helpers;
 using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
+using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -18,8 +19,10 @@ namespace ApiCalendarizarProcesos.Endpoints {
             RouteGroupBuilder group = routes.MapGroup("/Procesos");
             group.MapPostEndpoint();
             group.MapDeleteEndpoint();
+            group.MapGetProcesosEndpoint();
+            group.MapGetCalendarizacionesEndpoint();
 
-            return routes;
+			return routes;
         }
 
         private static IEndpointRouteBuilder MapPostEndpoint(this IEndpointRouteBuilder routes) {
@@ -207,5 +210,105 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
             return routes;
         }
-    }
+
+		private static IEndpointRouteBuilder MapGetProcesosEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, IDynamoHelper dynamo) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
+					string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
+
+                    List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaProcesos))
+                        .Where(p => {
+                            if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
+
+                            return p.TryGetValue("Nombre", out object? nombre) &&
+                                   nombre is string nombreTexto &&
+                                   nombreTexto.StartsWith(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+                        })
+                    ];
+
+                    formato ??= "json";
+					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
+						byte[] csv = CsvHelper.ToCsv(retorno);
+
+						LambdaLogger.Log(
+							$"[GET] - [Procesos] - [GetProcesos] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+							$"Se obtienen exitosamente los procesos en formato CSV - Cantidad: {retorno.Count}.");
+
+						return Results.File(
+							csv,
+							"text/csv",
+							$"Procesos_{Guid.NewGuid()}.csv"
+						);
+					}
+
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetProcesos] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se obtienen exitosamente los procesos - Cantidad: {retorno.Count}.");
+
+					return Results.Ok(retorno);
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetProcesos] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al obtener los procesos según filtro - Nombre: {filtroNombre}. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
+
+		private static IEndpointRouteBuilder MapGetCalendarizacionesEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapGet("/Calendarizaciones", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, IDynamoHelper dynamo) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
+					string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
+
+					List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaCalendarizaciones))
+						.Where(p => {
+							if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
+
+							return p.TryGetValue("Nombre", out object? nombre) &&
+								   nombre is string nombreTexto &&
+								   nombreTexto.StartsWith(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+						})
+					];
+
+					formato ??= "json";
+					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
+                        byte[] csv = CsvHelper.ToCsv(retorno);
+
+						LambdaLogger.Log(
+						    $"[GET] - [Procesos] - [GetCalendarizaciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						    $"Se obtienen exitosamente las calendarizaciones en formato CSV - Cantidad: {retorno.Count}.");
+
+						return Results.File(
+                            csv,
+                            "text/csv",
+                            $"Procesos_{Guid.NewGuid()}.csv"
+                        );
+                    }
+
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetCalendarizaciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se obtienen exitosamente las calendarizaciones - Cantidad: {retorno.Count}.");
+
+					return Results.Ok(retorno);
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetCalendarizaciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al obtener las calendarizaciones según filtro - Nombre: {filtroNombre}. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
+	}
 }
