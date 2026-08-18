@@ -1,4 +1,5 @@
-﻿using Amazon.Scheduler;
+﻿using Amazon;
+using Amazon.Scheduler;
 using Amazon.Scheduler.Model;
 using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
@@ -6,7 +7,17 @@ using System.Net;
 
 namespace ApiCalendarizarProcesos.Helpers {
     public class SchedulerHelper(IAmazonScheduler client) : ISchedulerHelper {
-        public async Task<Schedule?> Crear(string nombre, string descripcion, string grupo, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc, string roleArn, string dlqArn, string targetArn, string targetInput) {
+        private static (string nombre, string grupo) ExtraerNombreYGrupoDeArn(string arn) {
+			string[] partes = arn.Split(':');
+			string recurso = partes[5];
+			string[] partesRecurso = recurso.Split('/');
+			string grupo = partesRecurso[1];
+			string nombre = partesRecurso[2];
+
+            return (nombre, grupo);
+		}
+
+        public async Task<Schedule> Crear(string nombre, string descripcion, string grupo, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc, string roleArn, string dlqArn, string targetArn, string targetInput) {
 			if ((cron == null && frecuenciaDias == null) || (cron != null && frecuenciaDias != null))
 				throw new InvalidOperationException("Se debe definir una configuración cron o frecuencia en días.");
 
@@ -44,12 +55,30 @@ namespace ApiCalendarizarProcesos.Helpers {
 
             CreateScheduleResponse response = await client.CreateScheduleAsync(request);
             if (response.HttpStatusCode != HttpStatusCode.OK) {
-                throw new Exception("No se pudo crear el schedule");
-            }
+				throw new HttpRequestException("No se pudo crear el schedule");
+			}
 
-            return await Obtener(nombre, grupo);
+            return new Schedule {
+				Nombre = nombre,
+				Descripcion = descripcion,
+				Grupo = grupo,
+				Cron = cron,
+				FrecuenciaDias = frecuenciaDias,
+				InicioEjecucionUtc = inicioEjecucionUtc,
+				Arn = response.ScheduleArn,
+                TargetArn = targetArn,
+                TargetRoleArn = roleArn,
+                TargetInput = targetInput,
+				TargetDlqArn = dlqArn
+			};
         }
         
+        public async Task EliminarPorArn(string arn) {
+			(string nombre, string grupo) = ExtraerNombreYGrupoDeArn(arn);
+            await Eliminar(nombre, grupo);
+
+		}
+
         public async Task Eliminar(string nombre, string grupo) {
             DeleteScheduleRequest request = new() { 
                 Name = nombre,
@@ -58,8 +87,13 @@ namespace ApiCalendarizarProcesos.Helpers {
 
             DeleteScheduleResponse response = await client.DeleteScheduleAsync(request);
             if (response.HttpStatusCode != HttpStatusCode.OK) {
-                throw new Exception("No se pudo eliminar el schedule");
-            }
+				throw new HttpRequestException("No se pudo eliminar el schedule");
+			}
+        }
+
+        public async Task<Schedule?> ObtenerPorArn(string arn) {
+            (string nombre, string grupo) = ExtraerNombreYGrupoDeArn(arn);
+            return await Obtener(nombre, grupo);
         }
 
         public async Task<Schedule?> Obtener(string nombre, string grupo) {
@@ -71,8 +105,8 @@ namespace ApiCalendarizarProcesos.Helpers {
             try {
                 GetScheduleResponse response = await client.GetScheduleAsync(request);
                 if (response.HttpStatusCode != HttpStatusCode.OK) {
-                    throw new Exception("No se pudo obtener el schedule");
-                }
+					throw new HttpRequestException("No se pudo obtener el schedule");
+				}
 
                 string? cron = null;
                 if (response.ScheduleExpression.Contains("cron(")) {
@@ -91,7 +125,11 @@ namespace ApiCalendarizarProcesos.Helpers {
                     FrecuenciaDias = frecuenciaDias,
 					InicioEjecucionUtc = response.StartDate,
 					Arn = response.Arn,
-                };
+                    TargetArn = response.Target.Arn,
+                    TargetRoleArn = response.Target.RoleArn,
+                    TargetInput = response.Target.Input,
+					TargetDlqArn = response.Target.DeadLetterConfig.Arn
+				};
             } catch (ResourceNotFoundException) {
                 return null;
             }

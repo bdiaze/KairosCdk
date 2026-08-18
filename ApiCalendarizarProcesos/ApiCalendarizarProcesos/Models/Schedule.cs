@@ -6,6 +6,10 @@
         public string? Cron { get; set; }
 		public int? FrecuenciaDias { get; set; }
 		public DateTime? InicioEjecucionUtc { get; set; }
-		public string? Arn { get; set; }
+		public required string Arn { get; set; }
+		public required string TargetArn { get; set; }
+		public required string TargetRoleArn { get; set; }
+        public required string TargetInput { get; set; }
+        public required string TargetDlqArn { get; set; }
     }
 }
