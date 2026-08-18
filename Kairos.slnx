@@ -3,5 +3,6 @@
   <Project Path="ApiCalendarizarProcesos/ApiCalendarizarProcesos/ApiCalendarizarProcesos.csproj" />
   <Project Path="LambdaDispatcher/LambdaDispatcher/LambdaDispatcher.csproj" />
   <Project Path="LambdaExecutor/LambdaExecutor/LambdaExecutor.csproj" />
+  <Project Path="LibreriaCompartida/LibreriaCompartida.csproj" Id="20cd3991-3671-4a6d-a9a5-118c8df8ee64" />
   <Project Path="src/KairosCdk/KairosCdk.csproj" />
 </Solution>
