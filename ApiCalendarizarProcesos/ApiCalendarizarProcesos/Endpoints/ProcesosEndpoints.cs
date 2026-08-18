@@ -1,15 +1,12 @@
-﻿using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DocumentModel;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Lambda.Core;
-using Amazon.Scheduler;
+﻿using Amazon.Lambda.Core;
 using ApiCalendarizarProcesos.Helpers;
 using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
+using LibreriaCompartida.Helpers;
+using LibreriaCompartida.Interfaces.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -26,18 +23,18 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapPostEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapPost("/", async (EntIngresarProceso entrada, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
+            routes.MapPost("/", async (EntIngresarProceso entrada, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
                     string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
 
-                    string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
-                    string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
-                    string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/NombreGrupo");
-                    string arnRoleSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/RoleArn");
-                    string arnDlqSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/DeadLetterQueueArn");
-                    string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
+                    string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
+                    string nombreTablaCalendarizaciones = variableEntorno.Obtener("DYNAMO_TABLE_CALENDARIZACIONES_NAME");
+                    string nombreScheduleGroup = variableEntorno.Obtener("NOMBRE_SCHEDULE_GROUP");
+                    string arnRoleSchedule = variableEntorno.Obtener("ARN_ROLE_SCHEDULE");
+                    string arnDlqSchedule = variableEntorno.Obtener("ARN_DLQ_SCHEDULE");
+                    string arnLambdaDispatcher = variableEntorno.Obtener("ARN_LAMBDA_DISPATCHER");
 
                     // Se limpia la entrada...
                     entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ", RegexOptions.NonBacktracking);
@@ -141,17 +138,17 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapDelete("/{idProceso}", async (string idProceso, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
+            routes.MapDelete("/{idProceso}", async (string idProceso, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
                     string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
 
-                    string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
-                    string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
-                    string nombreScheduleGroup = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/NombreGrupo");
-                    string arnRoleSchedule = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Schedule/RoleArn");
-                    string arnLambdaDispatcher = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/Dispatcher/LambdaArn");
+					string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
+					string nombreTablaCalendarizaciones = variableEntorno.Obtener("DYNAMO_TABLE_CALENDARIZACIONES_NAME");
+					string nombreScheduleGroup = variableEntorno.Obtener("NOMBRE_SCHEDULE_GROUP");
+					string arnRoleSchedule = variableEntorno.Obtener("ARN_ROLE_SCHEDULE");
+					string arnLambdaDispatcher = variableEntorno.Obtener("ARN_LAMBDA_DISPATCHER");
 
                     // Se obtiene el proceso a eliminar...
                     Dictionary<string, object?>? proceso = await dynamo.Obtener(nombreTablaProcesos, new Dictionary<string, object?> {
@@ -212,12 +209,12 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
 		private static IEndpointRouteBuilder MapGetProcesosEndpoint(this IEndpointRouteBuilder routes) {
-			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, IDynamoHelper dynamo) => {
+			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IDynamoHelper dynamo) => {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
 					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-					string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
+					string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
 
                     List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaProcesos))
                         .Where(p => {
@@ -262,12 +259,12 @@ namespace ApiCalendarizarProcesos.Endpoints {
 		}
 
 		private static IEndpointRouteBuilder MapGetCalendarizacionesEndpoint(this IEndpointRouteBuilder routes) {
-			routes.MapGet("/Calendarizaciones", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IParameterStoreHelper parameterStore, IDynamoHelper dynamo) => {
+			routes.MapGet("/Calendarizaciones", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IDynamoHelper dynamo) => {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
 					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-					string nombreTablaCalendarizaciones = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaCalendarizaciones");
+					string nombreTablaCalendarizaciones = variableEntorno.Obtener("DYNAMO_TABLE_CALENDARIZACIONES_NAME");
 
 					List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaCalendarizaciones))
 						.Where(p => {

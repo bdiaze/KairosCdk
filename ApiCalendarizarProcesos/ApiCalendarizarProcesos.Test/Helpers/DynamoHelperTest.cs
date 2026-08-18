@@ -1,11 +1,7 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using ApiCalendarizarProcesos.Helpers;
+using LibreriaCompartida.Helpers;
 using NSubstitute;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace ApiCalendarizarProcesos.Test.Helpers {
 	public class DynamoHelperTest {
 		private readonly IAmazonDynamoDB client = Substitute.For<IAmazonDynamoDB>();

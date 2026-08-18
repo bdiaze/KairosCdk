@@ -6,12 +6,11 @@ using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
-using Amazon.SimpleSystemsManagement;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Amazon.StepFunctions;
 using Amazon.StepFunctions.Model;
-using LambdaExecutor.Helpers;
+using LibreriaCompartida.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
@@ -34,13 +33,11 @@ public class Function
         var builder = Host.CreateDefaultBuilder();
         builder.ConfigureServices((context, services) => {
             #region Singleton AWS Services
-            services.AddSingleton<IAmazonSimpleSystemsManagement, AmazonSimpleSystemsManagementClient>();
             services.AddSingleton<IAmazonSecurityTokenService, AmazonSecurityTokenServiceClient>();
             #endregion
 
             #region Singleton Helpers
             services.AddSingleton<VariableEntornoHelper>();
-            services.AddSingleton<ParameterStoreHelper>();
             #endregion
         });
 
@@ -60,7 +57,6 @@ public class Function
             $"Se inicia executor de procesos.");
 
         VariableEntornoHelper variableEntorno = serviceProvider.GetRequiredService<VariableEntornoHelper>();
-        ParameterStoreHelper parameterStore = serviceProvider.GetRequiredService<ParameterStoreHelper>();
         IAmazonSecurityTokenService securityTokenClient = serviceProvider.GetRequiredService<IAmazonSecurityTokenService>();
 
         LambdaLogger.Log(

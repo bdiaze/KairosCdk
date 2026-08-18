@@ -1,12 +1,9 @@
 using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.DocumentModel;
-using Amazon.DynamoDBv2.Model;
 using Amazon.Lambda.Core;
-using Amazon.SimpleSystemsManagement;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using LambdaDispatcher.Helpers;
 using LambdaDispatcher.Models;
+using LibreriaCompartida.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
@@ -25,14 +22,12 @@ public class Function
         var builder = Host.CreateDefaultBuilder();
         builder.ConfigureServices((context, services) => {
             #region Singleton AWS Services
-            services.AddSingleton<IAmazonSimpleSystemsManagement, AmazonSimpleSystemsManagementClient>();
             services.AddSingleton<IAmazonDynamoDB, AmazonDynamoDBClient>();
             services.AddSingleton<IAmazonSQS, AmazonSQSClient>();
             #endregion
 
             #region Singleton Helpers
             services.AddSingleton<VariableEntornoHelper>();
-            services.AddSingleton<ParameterStoreHelper>();
             services.AddSingleton<DynamoHelper>();
             #endregion
         });
@@ -50,7 +45,6 @@ public class Function
             $"Se inicia dispatcher de procesos.");
         
         VariableEntornoHelper variableEntorno = serviceProvider.GetRequiredService<VariableEntornoHelper>();
-        ParameterStoreHelper parameterStore = serviceProvider.GetRequiredService<ParameterStoreHelper>();
         DynamoHelper dynamoHelper = serviceProvider.GetRequiredService<DynamoHelper>();
         IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
 
@@ -59,8 +53,9 @@ public class Function
             $"Se obtendran los parametros necesarios para despachar los procesos.");
 
         string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-        string nombreTablaProcesos = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/DynamoDB/NombreTablaProcesos");
-        string sqsQueueUrl = await parameterStore.ObtenerParametro($"/{nombreAplicacion}/SQS/QueueUrl");
+
+		string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
+		string sqsQueueUrl = variableEntorno.Obtener("SQS_QUEUE_URL");
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +

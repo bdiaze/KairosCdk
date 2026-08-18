@@ -1,10 +1,7 @@
-﻿using ApiCalendarizarProcesos.Helpers;
+﻿using LibreriaCompartida.Helpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace ApiCalendarizarProcesos.Test.Helpers {
 	public class VariableEntornoHelperTest {
