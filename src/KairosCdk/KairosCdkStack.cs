@@ -56,6 +56,23 @@ namespace KairosCdk
             string notificationEmails = System.Environment.GetEnvironmentVariable("NOTIFICATION_EMAILS") ?? throw new ArgumentNullException("NOTIFICATION_EMAILS");
 
             #region DynamoDB
+            // Se crea Single-Table Design para aplicación...
+            Table tablaApp = new(this, $"{appName}DynamoDBTable", new TableProps {
+				TableName = appName,
+				PartitionKey = new Attribute {
+					Name = "PK",
+					Type = AttributeType.STRING
+				},
+                SortKey = new Attribute {
+                    Name = "SK",
+					Type = AttributeType.STRING
+				},
+                TimeToLiveAttribute = "TTL",
+				DeletionProtection = true,
+				BillingMode = BillingMode.PAY_PER_REQUEST,
+				RemovalPolicy = RemovalPolicy.DESTROY
+			});
+
             // Se crean tablas para registrar los procesos y calendarizaciones...
             Table tablaProcesos = new(this, $"{appName}DynamoDBTableProcesos", new TableProps {
                 TableName = $"{appName}Procesos",
@@ -86,32 +103,11 @@ namespace KairosCdk
                 BillingMode = BillingMode.PAY_PER_REQUEST,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
-
-            StringParameter stringParameterDynamoProcesos = new(this, $"{appName}StringParameterDynamoProcesos", new StringParameterProps {
-                ParameterName = $"/{appName}/DynamoDB/NombreTablaProcesos",
-                Description = $"Nombre tabla de procesos de DynamoDB de la aplicacion {appName}",
-                StringValue = tablaProcesos.TableName,
-                Tier = ParameterTier.STANDARD,
-            });
-
-            StringParameter stringParameterDynamoCalendarizaciones = new(this, $"{appName}StringParameterDynamoCalendarizaciones", new StringParameterProps {
-                ParameterName = $"/{appName}/DynamoDB/NombreTablaCalendarizaciones",
-                Description = $"Nombre tabla de calendarizaciones de DynamoDB de la aplicacion {appName}",
-                StringValue = tablaCalendarizacion.TableName,
-                Tier = ParameterTier.STANDARD,
-            });
             #endregion
 
             #region Scheduler
             CfnScheduleGroup scheduleGroup = new(this, $"{appName}ScheduleGroup", new CfnScheduleGroupProps {
                 Name = $"{appName}ScheduleGroup"
-            });
-
-            StringParameter stringParameterScheduleGroup = new(this, $"{appName}StringParameterScheduleGroup", new StringParameterProps {
-                ParameterName = $"/{appName}/Schedule/NombreGrupo",
-                Description = $"Nombre del Schedule Group de la aplicacion {appName}",
-                StringValue = scheduleGroup.Name,
-                Tier = ParameterTier.STANDARD,
             });
             #endregion
 
@@ -160,13 +156,6 @@ namespace KairosCdk
                 TreatMissingData = TreatMissingData.NOT_BREACHING,
             });
             alarm.AddAlarmAction(new SnsAction(topic));
-
-            StringParameter stringParameterQueueUrl = new(this, $"{appName}StringParameterQueueUrl", new StringParameterProps {
-                ParameterName = $"/{appName}/SQS/QueueUrl",
-                Description = $"Queue URL de la aplicacion {appName}",
-                StringValue = queue.QueueUrl,
-                Tier = ParameterTier.STANDARD,
-            });
             #endregion
 
             #region Lambda Dispatcher
@@ -192,16 +181,6 @@ namespace KairosCdk
                         new PolicyDocument(new PolicyDocumentProps {
                             Statements = [
                                 new PolicyStatement(new PolicyStatementProps{
-                                    Sid = $"{appName}AccessToParameterStore",
-                                    Actions = [
-                                        "ssm:GetParameter"
-                                    ],
-                                    Resources = [
-                                        stringParameterDynamoProcesos.ParameterArn,
-                                        stringParameterQueueUrl.ParameterArn,
-                                    ],
-                                }),
-                                new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToSQS",
                                     Actions = [
                                         "sqs:SendMessage"
@@ -213,12 +192,13 @@ namespace KairosCdk
                                 new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToDynamoDB",
                                     Actions = [
-                                        "dynamodb:Query"
-                                    ],
+                                        "dynamodb:Query",
+									],
                                     Resources = [
                                         tablaProcesos.TableArn,
                                         $"{tablaProcesos.TableArn}/*",
-                                    ],
+										tablaApp.TableArn,
+									],
                                 })
                             ]
                         })
@@ -262,17 +242,13 @@ namespace KairosCdk
                 LogGroup = dispatcherLogGroup,
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
-                },
+					{ "DYNAMO_TABLE_NAME", tablaApp.TableName },
+					{ "DYNAMO_TABLE_PROCESOS_NAME", tablaProcesos.TableName },
+					{ "SQS_QUEUE_URL", queue.QueueUrl },
+				},
                 Role = roleDispatcherLambda,
                 DeadLetterQueueEnabled = true,
                 DeadLetterQueue = dispatcherDlq,
-            });
-
-            StringParameter stringParameterDispatcherFunction = new(this, $"{appName}StringParameterDispatcherFunction", new StringParameterProps {
-                ParameterName = $"/{appName}/Dispatcher/LambdaArn",
-                Description = $"ARN del Lambda dispatcher de la aplicacion {appName}",
-                StringValue = dispatcherFunction.FunctionArn,
-                Tier = ParameterTier.STANDARD,
             });
             #endregion
 
@@ -307,7 +283,16 @@ namespace KairosCdk
                                         $"arn:aws:iam::{this.Account}:role/{executorPrefixRoles}*"
                                     ],
                                 }),
-                            ]
+								new PolicyStatement(new PolicyStatementProps{
+									Sid = $"{appName}AccessToDynamoDB",
+									Actions = [
+										"dynamodb:PutItem",
+									],
+									Resources = [
+										tablaApp.TableArn,
+									],
+								}),
+							]
                         })
                     }
                 }
@@ -340,7 +325,8 @@ namespace KairosCdk
                 LogGroup = executorLogGroup,
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
-                },
+					{ "DYNAMO_TABLE_NAME", tablaApp.TableName },
+				},
                 Role = roleExecutorLambda,
             });
 
@@ -357,14 +343,7 @@ namespace KairosCdk
                 RetentionPeriod = Duration.Days(14),
                 EnforceSSL = true,
             });
-
-            StringParameter stringParameterScheduleDlq = new(this, $"{appName}StringParameterScheduleDlq", new StringParameterProps {
-                ParameterName = $"/{appName}/Schedule/DeadLetterQueueArn",
-                Description = $"ARN del Dead Letter Queue para Schedule de la aplicacion {appName}",
-                StringValue = schedulerDlq.QueueArn,
-                Tier = ParameterTier.STANDARD,
-            });
-                        
+                                    
             // Se crea alarma para enviar notificación cuando llegue un elemento al DLQ...
             Alarm alarmScheduleDlq = new(this, $"{appName}ScheduleDeadLetterQueueAlarm", new AlarmProps {
                 AlarmName = $"{appName}ScheduleDeadLetterQueueAlarm",
@@ -414,13 +393,6 @@ namespace KairosCdk
                     }
                 }
             });
-
-            StringParameter stringParameterRoleScheduler = new(this, $"{appName}StringParameterRoleScheduler", new StringParameterProps {
-                ParameterName = $"/{appName}/Schedule/RoleArn",
-                Description = $"ARN del Rol para Schedule de la aplicacion {appName}",
-                StringValue = roleScheduler.RoleArn,
-                Tier = ParameterTier.STANDARD,
-            });
             #endregion
 
             #region API Gateway y Lambda
@@ -446,20 +418,6 @@ namespace KairosCdk
                         new PolicyDocument(new PolicyDocumentProps {
                             Statements = [
                                 new PolicyStatement(new PolicyStatementProps{
-                                    Sid = $"{appName}AccessToParameterStore",
-                                    Actions = [
-                                        "ssm:GetParameter"
-                                    ],
-                                    Resources = [
-                                        stringParameterDynamoProcesos.ParameterArn,
-                                        stringParameterDynamoCalendarizaciones.ParameterArn,
-                                        stringParameterRoleScheduler.ParameterArn,
-                                        stringParameterDispatcherFunction.ParameterArn,
-                                        stringParameterScheduleGroup.ParameterArn,
-                                        stringParameterScheduleDlq.ParameterArn,
-                                    ],
-                                }),
-                                new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToScheduler",
                                     Actions = [
                                         "scheduler:CreateSchedule",
@@ -477,14 +435,16 @@ namespace KairosCdk
                                         "dynamodb:DeleteItem",
                                         "dynamodb:GetItem",
                                         "dynamodb:Query",
-										"dynamodb:Scan"
+										"dynamodb:Scan",
+										"dynamodb:TransactWriteItems"
 									],
                                     Resources = [
                                         tablaProcesos.TableArn,
                                         $"{tablaProcesos.TableArn}/*",
                                         tablaCalendarizacion.TableArn,
                                         $"{tablaCalendarizacion.TableArn}/*",
-                                    ],
+										tablaApp.TableArn,
+									],
                                 }),
                                 new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToIAM",
@@ -514,7 +474,14 @@ namespace KairosCdk
                 LogGroup = logGroup,
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
-                },
+					{ "DYNAMO_TABLE_NAME", tablaApp.TableName },
+					{ "DYNAMO_TABLE_PROCESOS_NAME", tablaProcesos.TableName },
+					{ "DYNAMO_TABLE_CALENDARIZACIONES_NAME", tablaCalendarizacion.TableName },
+					{ "NOMBRE_SCHEDULE_GROUP", scheduleGroup.Name },
+					{ "ARN_ROLE_SCHEDULE", roleScheduler.RoleArn },
+					{ "ARN_DLQ_SCHEDULE", schedulerDlq.QueueArn },
+					{ "ARN_LAMBDA_DISPATCHER", dispatcherFunction.FunctionArn },
+				},
                 Role = roleLambda,
             });
 
