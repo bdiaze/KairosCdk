@@ -80,7 +80,10 @@ namespace LibreriaCompartida.Repositories {
 				QueryRequest request = new() {
 					TableName = DYNAMO_TABLE_NAME,
 					KeyConditionExpression = "PK = :pk AND begins_with(SK, :sk)",
-					ExpressionAttributeValues = Calendarizacion.GenerarKey(),
+					ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+						[":pk"] = new AttributeValue() { S = Calendarizacion.GenerarPK() },
+						[":sk"] = new AttributeValue() { S = Calendarizacion.GenerarSK() },
+					},
 					ExclusiveStartKey = lastKey
 				};
 

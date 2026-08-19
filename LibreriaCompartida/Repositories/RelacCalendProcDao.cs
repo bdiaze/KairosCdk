@@ -36,7 +36,10 @@ namespace LibreriaCompartida.Repositories {
 				QueryRequest request = new() {
 					TableName = DYNAMO_TABLE_NAME,
 					KeyConditionExpression = "PK = :pk AND begins_with(SK, :sk)",
-					ExpressionAttributeValues = RelacCalendProc.GenerarKey(idCalendarizacion),
+					ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+						[":pk"] = new AttributeValue() { S = RelacCalendProc.GenerarPK() },
+						[":sk"] = new AttributeValue() { S = RelacCalendProc.GenerarSK(idCalendarizacion) },
+					},
 					ExclusiveStartKey = lastKey
 				};
 

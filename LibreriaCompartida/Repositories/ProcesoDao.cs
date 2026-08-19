@@ -131,7 +131,10 @@ namespace LibreriaCompartida.Repositories {
 				QueryRequest request = new() {
 					TableName = DYNAMO_TABLE_NAME,
 					KeyConditionExpression = "PK = :pk AND begins_with(SK, :sk)",
-					ExpressionAttributeValues = Proceso.GenerarKey(),
+					ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+						[":pk"] = new AttributeValue() { S = Proceso.GenerarPK() },
+						[":sk"] = new AttributeValue() { S = Proceso.GenerarSK() },
+					},
 					ExclusiveStartKey = lastKey
 				};
 
