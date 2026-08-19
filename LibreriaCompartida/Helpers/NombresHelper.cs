@@ -98,30 +98,9 @@ namespace LibreriaCompartida.Helpers {
 		}
 				
 		public static string GenerarNombreProceso(string nombre) {
-			Console.WriteLine(
-				string.Join(
-					" | ",
-					nombre.Select(c => $"{c} U+{(int)c:X4}")
-				)
-			);
-
 			// Se quitan tildes...
-			nombre = nombre.Normalize(NormalizationForm.FormD);
-			Console.WriteLine(
-				string.Join(
-					" | ",
-					nombre.Select(c => $"{c} U+{(int)c:X4}")
-				)
-			);
-
+			nombre = nombre.Normalize(NormalizationForm.FormKD);
 			nombre = new string([.. nombre.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)]);
-
-			Console.WriteLine(
-				string.Join(
-					" | ",
-					nombre.Select(c => $"{c} U+{(int)c:X4}")
-				)
-			);
 
 			// Se reemplazan caracteres de posibles Cron...
 			nombre = nombre.Replace("*", "x").Replace("?", "x").Replace(",", ".");
