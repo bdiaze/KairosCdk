@@ -1,18 +1,35 @@
 ﻿using Amazon.DynamoDBv2.Model;
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class Proceso : Base {
 		public override string PK => GenerarPK();
 		public override string SK => GenerarSK(IdProceso);
+
+		[JsonPropertyName("IdProceso")]
 		public required string IdProceso { get; set; }
+
+		[JsonPropertyName("IdCalendarizacion")]
 		public required string IdCalendarizacion { get; set; }
+
+		[JsonPropertyName("Nombre")]
 		public required string Nombre { get; set; }
+
+		[JsonPropertyName("ArnRol")]
 		public required string ArnRol { get; set; }
+
+		[JsonPropertyName("ArnProceso")]
 		public required string ArnProceso { get; set; }
+
+		[JsonPropertyName("Parametros")]
 		public required string Parametros { get; set; }
+
+		[JsonPropertyName("FechaUltimaEjecucionUtc")]
 		public DateTime? FechaUltimaEjecucionUtc { get; set; }
+
+		[JsonPropertyName("FechaCreacionUtc")]
 		public required DateTime FechaCreacionUtc { get; set; }
 
 		public static string GenerarPK() {
