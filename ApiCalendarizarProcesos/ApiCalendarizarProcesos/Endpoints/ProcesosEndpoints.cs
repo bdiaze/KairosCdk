@@ -1,15 +1,10 @@
 ﻿using Amazon.Lambda.Core;
 using ApiCalendarizarProcesos.Helpers;
-using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
 using ApiCalendarizarProcesos.UseCases;
 using LibreriaCompartida.Entities;
-using LibreriaCompartida.Helpers;
-using LibreriaCompartida.Interfaces.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
-using System.Globalization;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace ApiCalendarizarProcesos.Endpoints {
@@ -20,7 +15,6 @@ namespace ApiCalendarizarProcesos.Endpoints {
             group.MapDeleteEndpoint();
             group.MapGetProcesosEndpoint();
             group.MapGetCalendarizacionesEndpoint();
-			group.MapMigrarModeloEndpoint();
 
 			return routes;
         }
@@ -110,26 +104,29 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
 		private static IEndpointRouteBuilder MapGetProcesosEndpoint(this IEndpointRouteBuilder routes) {
-			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IDynamoHelper dynamo) => {
+			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, ProcesoUseCase procesoUseCase) => {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
-					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-					string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
-
-                    List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaProcesos))
-                        .Where(p => {
-                            if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
-
-                            return p.TryGetValue("Nombre", out object? nombre) &&
-                                   nombre is string nombreTexto &&
-                                   nombreTexto.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
-                        })
-                    ];
+					List<Proceso> retorno = [.. (await procesoUseCase.ObtenerTodosProcesos())
+						.Where(p => {
+							if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
+							return p.Nombre.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+						})
+					];
 
                     formato ??= "json";
 					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
-						byte[] csv = CsvHelper.ToCsv(retorno);
+						byte[] csv = CsvHelper.ToCsv([.. retorno.Select(r => new Dictionary<string, object?>() {
+							["IdProceso"] = r.IdProceso,
+							["IdCalendarizacion"] = r.IdCalendarizacion,
+							["Nombre"] = r.Nombre,
+							["ArnRol"] = r.ArnRol,
+							["ArnProceso"] = r.ArnProceso,
+							["Parametros"] = r.Parametros,
+							["FechaUltimaEjecucionUtc"] = r.FechaUltimaEjecucionUtc,
+							["FechaCreacionUtc"] = r.FechaCreacionUtc
+						})]);
 
 						LambdaLogger.Log(
 							$"[GET] - [Procesos] - [GetProcesos] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
@@ -160,26 +157,31 @@ namespace ApiCalendarizarProcesos.Endpoints {
 		}
 
 		private static IEndpointRouteBuilder MapGetCalendarizacionesEndpoint(this IEndpointRouteBuilder routes) {
-			routes.MapGet("/Calendarizaciones", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, IVariableEntornoHelper variableEntorno, IDynamoHelper dynamo) => {
+			routes.MapGet("/Calendarizaciones", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, ProcesoUseCase procesoUseCase) => {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
-					string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-					string nombreTablaCalendarizaciones = variableEntorno.Obtener("DYNAMO_TABLE_CALENDARIZACIONES_NAME");
-
-					List<Dictionary<string, object?>> retorno = [.. (await dynamo.ObtenerTodos(nombreTablaCalendarizaciones))
+					List<Calendarizacion> retorno = [.. (await procesoUseCase.ObtenerTodasCalendarizaciones())
 						.Where(p => {
 							if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
-
-							return p.TryGetValue("Nombre", out object? nombre) &&
-								   nombre is string nombreTexto &&
-								   nombreTexto.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+							return p.Nombre.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
 						})
 					];
 
 					formato ??= "json";
 					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
-                        byte[] csv = CsvHelper.ToCsv(retorno);
+                        byte[] csv = CsvHelper.ToCsv([.. retorno.Select(r => new Dictionary<string, object?>() {
+							["IdCalendarizacion"] = r.IdCalendarizacion,
+							["Nombre"] = r.Nombre,
+							["Descripcion"] = r.Descripcion,
+							["Grupo"] = r.Grupo,
+							["Arn"] = r.Arn,
+							["CantProcesos"] = r.CantProcesos,
+							["Cron"] = r.Cron,
+							["FrecuenciaDias"] = r.FrecuenciaDias,
+							["InicioEjecucionUtc"] = r.InicioEjecucionUtc,
+							["FechaCreacionUtc"] = r.FechaCreacionUtc,
+						})]);
 
 						LambdaLogger.Log(
 						    $"[GET] - [Procesos] - [GetCalendarizaciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +

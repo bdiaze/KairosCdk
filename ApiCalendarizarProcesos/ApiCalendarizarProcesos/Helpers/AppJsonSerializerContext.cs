@@ -12,9 +12,9 @@ namespace ApiCalendarizarProcesos.Helpers {
     [JsonSerializable(typeof(ProblemDetails))]
     [JsonSerializable(typeof(EntIngresarProceso))]
     [JsonSerializable(typeof(DispatcherInput))]
-    [JsonSerializable(typeof(Dictionary<string, object>))]
-    [JsonSerializable(typeof(List<Dictionary<string, object?>>))]
 	[JsonSerializable(typeof(Proceso))]
+	[JsonSerializable(typeof(List<Proceso>))]
+	[JsonSerializable(typeof(List<Calendarizacion>))]
 	internal partial class AppJsonSerializerContext : JsonSerializerContext {
 
     }
