@@ -4,6 +4,10 @@ using LibreriaCompartida.Repositories;
 
 namespace ApiCalendarizarProcesos.Business {
 	public class ProcesoBusiness(ProcesoDao procesoDao) {
+		public async Task<List<Proceso>> ObtenerTodos() {
+			return await procesoDao.ObtenerTodos();
+		}
+
 		public async Task<(Proceso, Proceso? procesoCreado)> ObtenerOCrear(string nombre, string arnRol, string arnProceso, string parametros, string idCalendarizacion) {
 			Proceso? procesoCreado = null;
 			try {

@@ -16,6 +16,10 @@ namespace ApiCalendarizarProcesos.Business {
 		private readonly string ARN_DLQ_SCHEDULE = variableEntornoHelper.Obtener("ARN_DLQ_SCHEDULE");
 		private readonly string ARN_LAMBDA_DISPATCHER = variableEntornoHelper.Obtener("ARN_LAMBDA_DISPATCHER");
 
+		public async Task<List<Calendarizacion>> ObtenerTodos() {
+			return await calendarizacionDao.ObtenerTodas();
+		}
+
 		private string GenerarDescripcion(string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
 			string descripcionInicio = "";
 			if (inicioEjecucionUtc != null) {
