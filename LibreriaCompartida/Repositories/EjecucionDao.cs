@@ -92,6 +92,27 @@ namespace LibreriaCompartida.Repositories {
 			}
 		}
 
+		public async Task CambiarEstado(string idEjecucion, EstadoEjecucion estado, string? observacion) {
+			UpdateItemRequest request = new() {
+				TableName = DYNAMO_TABLE_NAME,
+				Key = Ejecucion.GenerarKey(idEjecucion),
+				UpdateExpression = "SET Estado = :estado, Observacion = :observacion",
+				ConditionExpression = "attribute_exists(PK)",
+				ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+					[":estado"] = new AttributeValue { S = estado.ToString() },
+					[":observacion"] = observacion == null
+						? new() { NULL = true }
+						: new() { S = observacion }
+				},
+			};
+
+			UpdateItemResponse response = await client.UpdateItemAsync(request);
+
+			if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+				throw new HttpRequestException("Ocurrió un error al registrar fecha de ejecución en DynamoDB");
+			}
+		}
+
 		public async Task<Ejecucion?> Obtener(string idEjecucion) {
 			GetItemRequest request = new() {
 				TableName = DYNAMO_TABLE_NAME,

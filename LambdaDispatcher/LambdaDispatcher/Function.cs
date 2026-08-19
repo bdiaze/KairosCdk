@@ -3,11 +3,14 @@ using Amazon.Lambda.Core;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using LambdaDispatcher.Models;
+using LibreriaCompartida.Entities;
+using LibreriaCompartida.Enums;
 using LibreriaCompartida.Helpers;
+using LibreriaCompartida.Interfaces.Helpers;
+using LibreriaCompartida.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
-using System.Text.Json;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -27,10 +30,14 @@ public class Function
             #endregion
 
             #region Singleton Helpers
-            services.AddSingleton<VariableEntornoHelper>();
-            services.AddSingleton<DynamoHelper>();
-            #endregion
-        });
+            services.AddSingleton<IVariableEntornoHelper, VariableEntornoHelper>();
+			#endregion
+
+			#region Singleton Daos
+			services.AddSingleton<RelacCalendProcDao>();
+			services.AddSingleton<EjecucionDao>();
+			#endregion
+		});
 
         var app = builder.Build();
 
@@ -43,57 +50,70 @@ public class Function
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - " +
             $"Se inicia dispatcher de procesos.");
-        
-        VariableEntornoHelper variableEntorno = serviceProvider.GetRequiredService<VariableEntornoHelper>();
-        DynamoHelper dynamoHelper = serviceProvider.GetRequiredService<DynamoHelper>();
-        IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
+
+		IAmazonSQS sqsClient = serviceProvider.GetRequiredService<IAmazonSQS>();
+		IVariableEntornoHelper variableEntorno = serviceProvider.GetRequiredService<IVariableEntornoHelper>();
+		RelacCalendProcDao relacCalendProcDao = serviceProvider.GetRequiredService<RelacCalendProcDao>();
+		EjecucionDao ejecucionDao = serviceProvider.GetRequiredService<EjecucionDao>();
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
             $"Se obtendran los parametros necesarios para despachar los procesos.");
 
-        string nombreAplicacion = variableEntorno.Obtener("APP_NAME");
-
-		string nombreTablaProcesos = variableEntorno.Obtener("DYNAMO_TABLE_PROCESOS_NAME");
 		string sqsQueueUrl = variableEntorno.Obtener("SQS_QUEUE_URL");
 
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
             $"Se consultaran los procesos que necesitan ser despachados.");
 
-        List<Dictionary<string, object?>> procesos = await dynamoHelper.ObtenerPorIndice(nombreTablaProcesos, "PorIdCalendarizacion", "IdCalendarizacion", input.IdCalendarizacion);
-        
+        List<RelacCalendProc> relaciones = await relacCalendProcDao.ObtenerPorCalendarizacion(input.IdCalendarizacion);
+
         LambdaLogger.Log(
             $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-            $"Se tiene {procesos.Count} procesos para despachar.");
+            $"Se tiene {relaciones.Count} procesos para despachar.");
 
-        foreach (Dictionary<string, object?> proceso in procesos) {
-            try {
-                if (!proceso.ContainsKey("Habilitado") || proceso["Habilitado"] == null || !(bool)proceso["Habilitado"]!) {
-                    LambdaLogger.Log(LogLevel.Warning,
-                        $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                        $"No se despacha el proceso ID {proceso["IdProceso"]} dado que no esta habilitado.");
-                    continue;
-                }
+        foreach (RelacCalendProc relacion in relaciones) {
+            Ejecucion? ejecucionCreada = null;
+
+			try {
+				ejecucionCreada = await ejecucionDao.Crear(
+					Guid.NewGuid().ToString(),
+                    relacion.IdProceso,
+                    DateTime.UtcNow,
+                    EstadoEjecucion.EncoladoOk,
+                    null,
+                    DateTimeOffset.UtcNow.AddDays(90).ToUnixTimeSeconds()
+				);
 
                 SendMessageRequest request = new() {
                     QueueUrl = sqsQueueUrl,
-                    MessageBody = JsonSerializer.Serialize(proceso)
-                };
+                    MessageBody = ejecucionCreada.IdEjecucion
+				};
 
                 SendMessageResponse response = await sqsClient.SendMessageAsync(request);
 
                 LambdaLogger.Log(
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                    $"Se despacha exitosamente el proceso ID {proceso["IdProceso"]}.");
+                    $"Se despacha exitosamente el proceso ID {relacion.IdProceso} - ID Ejecución: {ejecucionCreada.IdEjecucion}.");
 
             } catch(Exception ex) {
+                if (ejecucionCreada != null) {
+                    await ejecucionDao.CambiarEstado(ejecucionCreada.IdEjecucion, EstadoEjecucion.ErrorAlEncolar, $"Error al encolar proceso - {ex}");
+                } else {
+					ejecucionCreada = await ejecucionDao.Crear(
+					    Guid.NewGuid().ToString(),
+					    relacion.IdProceso,
+					    DateTime.UtcNow,
+					    EstadoEjecucion.ErrorAlEncolar,
+						$"Error al encolar proceso - {ex}",
+					    DateTimeOffset.UtcNow.AddDays(90).ToUnixTimeSeconds()
+				    );
+				}
 
                 LambdaLogger.Log(LogLevel.Error,
                     $"[Function] - [FunctionHandler] - [{stopwatch.ElapsedMilliseconds} ms] - " +
-                    $"Ocurrio un error al despachar proceso - ID: {proceso["IdProceso"]}. " +
+                    $"Ocurrio un error al despachar proceso - ID: {relacion.IdProceso} - ID Ejecución: {ejecucionCreada.IdEjecucion}. " +
                     $"{ex}");
-
             }
         }
 

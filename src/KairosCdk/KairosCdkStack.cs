@@ -193,10 +193,11 @@ namespace KairosCdk
                                     Sid = $"{appName}AccessToDynamoDB",
                                     Actions = [
 										"dynamodb:Query",
+										"dynamodb:PutItem",
+										"dynamodb:UpdateItem",
+										"dynamodb:TransactWriteItems"
 									],
                                     Resources = [
-                                        tablaProcesos.TableArn,
-                                        $"{tablaProcesos.TableArn}/*",
 										tablaApp.TableArn,
 									],
                                 })
@@ -243,7 +244,6 @@ namespace KairosCdk
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
 					{ "DYNAMO_TABLE_NAME", tablaApp.TableName },
-					{ "DYNAMO_TABLE_PROCESOS_NAME", tablaProcesos.TableName },
 					{ "SQS_QUEUE_URL", queue.QueueUrl },
 				},
                 Role = roleDispatcherLambda,
@@ -286,9 +286,8 @@ namespace KairosCdk
 								new PolicyStatement(new PolicyStatementProps{
 									Sid = $"{appName}AccessToDynamoDB",
 									Actions = [
-										"dynamodb:PutItem",
+										"dynamodb:GetItem",
 										"dynamodb:UpdateItem",
-										"dynamodb:TransactWriteItems"
 									],
 									Resources = [
 										tablaApp.TableArn,
