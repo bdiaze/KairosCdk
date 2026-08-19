@@ -5,7 +5,10 @@ using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class Proceso : Base {
+		[JsonIgnore]
 		public override string PK => GenerarPK();
+
+		[JsonIgnore]
 		public override string SK => GenerarSK(IdProceso);
 
 		[JsonPropertyName("IdProceso")]

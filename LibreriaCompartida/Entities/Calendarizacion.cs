@@ -2,20 +2,44 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class Calendarizacion : Base {
+		[JsonIgnore]
 		public override string PK => GenerarPK();
+
+		[JsonIgnore]
 		public override string SK => GenerarSK(IdCalendarizacion);
+
+		[JsonPropertyName("IdCalendarizacion")]
 		public required string IdCalendarizacion { get; set; }
+
+		[JsonPropertyName("Nombre")]
 		public required string Nombre { get; set; }
+
+		[JsonPropertyName("Descripcion")]
 		public required string Descripcion { get; set; }
+
+		[JsonPropertyName("Grupo")]
 		public required string Grupo { get; set; }
+
+		[JsonPropertyName("Arn")]
 		public required string Arn { get; set; }
+
+		[JsonPropertyName("CantProcesos")]
 		public required int CantProcesos { get; set; }
+
+		[JsonPropertyName("Cron")]
 		public string? Cron { get; set; }
+
+		[JsonPropertyName("FrecuenciaDias")]
 		public int? FrecuenciaDias { get; set; }
+
+		[JsonPropertyName("InicioEjecucionUtc")]
 		public DateTime? InicioEjecucionUtc { get; set; }
+
+		[JsonPropertyName("FechaCreacionUtc")]
 		public required DateTime FechaCreacionUtc { get; set; }
 
 		public static string GenerarPK() {

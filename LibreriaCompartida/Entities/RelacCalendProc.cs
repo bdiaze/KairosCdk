@@ -1,11 +1,19 @@
 ﻿using Amazon.DynamoDBv2.Model;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class RelacCalendProc : Base {
+		[JsonIgnore]
 		public override string PK => GenerarPK();
+
+		[JsonIgnore]
 		public override string SK => GenerarSK(IdCalendarizacion, IdProceso);
+
+		[JsonPropertyName("IdCalendarizacion")]
 		public required string IdCalendarizacion { get; set; }
+
+		[JsonPropertyName("IdProceso")]
 		public required string IdProceso { get; set; }
 
 		public static string GenerarPK() {

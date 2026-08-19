@@ -2,12 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public abstract class Base {
 		public abstract string PK { get; }
 		public abstract string SK { get; }
 
+		[JsonIgnore]
 		public Dictionary<string, AttributeValue> Key {
 			get {
 				return new Dictionary<string, AttributeValue> {

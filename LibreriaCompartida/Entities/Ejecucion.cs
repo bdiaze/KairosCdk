@@ -2,17 +2,35 @@
 using LibreriaCompartida.Enums;
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class Ejecucion : Base {
+		[JsonIgnore]
 		public override string PK => GenerarPK();
+
+		[JsonIgnore]
 		public override string SK => GenerarSK(IdEjecucion);
+
+		[JsonPropertyName("IdEjecucion")]
 		public required string IdEjecucion { get; set; }
+
+		[JsonPropertyName("IdProceso")]
 		public required string IdProceso { get; set; }
+
+		[JsonPropertyName("FechaEncolamientoUtc")]
 		public required DateTime FechaEncolamientoUtc { get; set; }
+
+		[JsonPropertyName("FechaEjecucionUtc")]
 		public required DateTime? FechaEjecucionUtc { get; set; }
+
+		[JsonPropertyName("Estado")]
 		public required EstadoEjecucion Estado { get; set; }
+
+		[JsonPropertyName("Observacion")]
 		public required string? Observacion { get; set; }
+
+		[JsonIgnore]
 		public required long TTL { get; set; }
 
 		public static string GenerarPK() {

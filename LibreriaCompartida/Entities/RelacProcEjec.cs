@@ -4,14 +4,26 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace LibreriaCompartida.Entities {
 	public class RelacProcEjec : Base {
+		[JsonIgnore]
 		public override string PK => GenerarPK();
+
+		[JsonIgnore]
 		public override string SK => GenerarSK(IdProceso, FechaEncolamientoUtc, IdEjecucion);
+
+		[JsonPropertyName("IdProceso")]
 		public required string IdProceso { get; set; }
+
+		[JsonPropertyName("IdEjecucion")]
 		public required string IdEjecucion { get; set; }
+
+		[JsonPropertyName("FechaEncolamientoUtc")]
 		public required DateTime FechaEncolamientoUtc { get; set; }
+
+		[JsonIgnore]
 		public required long TTL { get; set; }
 
 		public static string GenerarPK() {
