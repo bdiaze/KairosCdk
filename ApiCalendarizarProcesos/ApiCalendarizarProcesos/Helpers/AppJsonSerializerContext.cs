@@ -1,5 +1,6 @@
 ﻿using Amazon.Lambda.APIGatewayEvents;
 using ApiCalendarizarProcesos.Models;
+using LibreriaCompartida.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
@@ -13,7 +14,8 @@ namespace ApiCalendarizarProcesos.Helpers {
     [JsonSerializable(typeof(DispatcherInput))]
     [JsonSerializable(typeof(Dictionary<string, object>))]
     [JsonSerializable(typeof(List<Dictionary<string, object?>>))]
-    internal partial class AppJsonSerializerContext : JsonSerializerContext {
+	[JsonSerializable(typeof(Proceso))]
+	internal partial class AppJsonSerializerContext : JsonSerializerContext {
 
     }
 }
