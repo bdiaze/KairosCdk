@@ -192,7 +192,7 @@ namespace KairosCdk
                                 new PolicyStatement(new PolicyStatementProps{
                                     Sid = $"{appName}AccessToDynamoDB",
                                     Actions = [
-                                        "dynamodb:Query",
+										"dynamodb:Query",
 									],
                                     Resources = [
                                         tablaProcesos.TableArn,
@@ -287,6 +287,8 @@ namespace KairosCdk
 									Sid = $"{appName}AccessToDynamoDB",
 									Actions = [
 										"dynamodb:PutItem",
+										"dynamodb:UpdateItem",
+										"dynamodb:TransactWriteItems"
 									],
 									Resources = [
 										tablaApp.TableArn,
@@ -432,6 +434,7 @@ namespace KairosCdk
                                     Sid = $"{appName}AccessToDynamoDB",
                                     Actions = [
                                         "dynamodb:PutItem",
+										"dynamodb:UpdateItem",
                                         "dynamodb:DeleteItem",
                                         "dynamodb:GetItem",
                                         "dynamodb:Query",
