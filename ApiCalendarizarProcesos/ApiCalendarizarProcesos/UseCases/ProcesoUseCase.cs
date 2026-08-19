@@ -1,9 +1,6 @@
 ﻿using ApiCalendarizarProcesos.Business;
 using ApiCalendarizarProcesos.Models;
 using LibreriaCompartida.Entities;
-using LibreriaCompartida.Helpers;
-using LibreriaCompartida.Interfaces.Helpers;
-using LibreriaCompartida.Repositories;
 using System.Text.RegularExpressions;
 
 namespace ApiCalendarizarProcesos.UseCases {
@@ -15,9 +12,6 @@ namespace ApiCalendarizarProcesos.UseCases {
 			try {
 				nombre = Regex.Replace(nombre.Trim(), @"\s+", " ", RegexOptions.NonBacktracking);
 				if (cron != null) cron = Regex.Replace(cron.Trim(), @"\s+", " ", RegexOptions.NonBacktracking).ToUpperInvariant();
-
-				string idCalendarizacion = NombresHelper.GenerarNombreCalendarizacion(cron, frecuenciaDias, inicioEjecucionUtc);
-				string idProceso = NombresHelper.GenerarNombreProceso(nombre);
 
 				(Calendarizacion calendarizacion, scheduleCreado, calendarizacionCreada) = await calendarizacionBusiness.ObtenerOCrear(cron, frecuenciaDias, inicioEjecucionUtc);
 				(Proceso proceso, procesoCreado) = await procesoBusiness.ObtenerOCrear(nombre, arnRol, arnProceso, parametros, calendarizacion.IdCalendarizacion);

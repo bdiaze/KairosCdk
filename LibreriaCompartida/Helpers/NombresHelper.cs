@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Amazon.Runtime.Internal;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -97,12 +98,30 @@ namespace LibreriaCompartida.Helpers {
 		}
 				
 		public static string GenerarNombreProceso(string nombre) {
+			Console.WriteLine(
+				string.Join(
+					" | ",
+					nombre.Select(c => $"{c} U+{(int)c:X4}")
+				)
+			);
+
 			// Se quitan tildes...
 			nombre = nombre.Normalize(NormalizationForm.FormD);
-			Console.WriteLine(nombre);
+			Console.WriteLine(
+				string.Join(
+					" | ",
+					nombre.Select(c => $"{c} U+{(int)c:X4}")
+				)
+			);
 
 			nombre = new string([.. nombre.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)]);
-			Console.WriteLine(nombre);
+
+			Console.WriteLine(
+				string.Join(
+					" | ",
+					nombre.Select(c => $"{c} U+{(int)c:X4}")
+				)
+			);
 
 			// Se reemplazan caracteres de posibles Cron...
 			nombre = nombre.Replace("*", "x").Replace("?", "x").Replace(",", ".");
