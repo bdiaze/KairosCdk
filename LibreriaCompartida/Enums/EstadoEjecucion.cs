@@ -4,7 +4,9 @@ using System.Text;
 
 namespace LibreriaCompartida.Enums {
 	public enum EstadoEjecucion {
-		EjecutadoOk = 1,
-		EjecutadoConError = 2,
+		EncoladoOk = 10,
+		ErrorAlEncolar = 15,
+		EjecutadoOk = 20,
+		ErrorAlEjecutar = 25,
 	}
 }

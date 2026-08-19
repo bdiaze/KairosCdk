@@ -6,39 +6,33 @@ using System.Text;
 namespace LibreriaCompartida.Entities {
 	public class Ejecucion : Base {
 		public override string PK => GenerarPK();
-		public override string SK => GenerarSK(IdProceso, FechaEjecucionUtc, IdEjecucion);
+		public override string SK => GenerarSK(IdEjecucion);
 		public required string IdEjecucion { get; set; }
 		public required string IdProceso { get; set; }
-		public required DateTime FechaEjecucionUtc { get; set; }
+		public required DateTime FechaEncolamientoUtc { get; set; }
+		public required DateTime? FechaEjecucionUtc { get; set; }
 		public required EstadoEjecucion Estado { get; set; }
+		public required string? Observacion { get; set; }
 		public required long TTL { get; set; }
 
 		public static string GenerarPK() {
 			return "EJECUCION";
 		}
 
-		public static string GenerarSK(string? idProceso = null, DateTime? fechaEjecucionUtc = null, string? idEjecucion = null) {
+		public static string GenerarSK(string? idEjecucion = null) {
 			StringBuilder sb = new();
-			sb.Append("PROC#");
-			if (idProceso != null) {
-				sb.Append(idProceso.Replace("#", ""));
-				sb.Append("#FECHA#");
-				if (fechaEjecucionUtc != null) {
-					sb.Append(fechaEjecucionUtc.Value.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture).Replace("#", ""));
-					sb.Append("#EJEC#");
-					if (idEjecucion != null) {
-						sb.Append(idEjecucion.Replace("#", ""));
-						sb.Append('#');
-					}
-				}
+			sb.Append("EJEC#");
+			if (idEjecucion != null) {
+				sb.Append(idEjecucion.Replace("#", ""));
+				sb.Append('#');
 			}
 			return sb.ToString();
 		}
 
-		public static Dictionary<string, AttributeValue> GenerarKey(string? idProceso = null, DateTime? fechaEjecucionUtc = null, string? idEjecucion = null) {
+		public static Dictionary<string, AttributeValue> GenerarKey(string? idEjecucion = null) {
 			return new Dictionary<string, AttributeValue> {
 				{ "PK", new AttributeValue() { S = GenerarPK() } },
-				{ "SK", new AttributeValue() { S = GenerarSK(idProceso, fechaEjecucionUtc, idEjecucion) } }
+				{ "SK", new AttributeValue() { S = GenerarSK(idEjecucion) } }
 			};
 		}
 
@@ -47,11 +41,16 @@ namespace LibreriaCompartida.Entities {
 				new Dictionary<string, AttributeValue>() {
 					{ "IdEjecucion", new AttributeValue { S = IdEjecucion } },
 					{ "IdProceso", new AttributeValue { S = IdProceso } },
-					{ "FechaEjecucionUtc", new AttributeValue { S = $"{FechaEjecucionUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)}" } },
+					{ "FechaEncolamientoUtc", new AttributeValue { S = $"{FechaEncolamientoUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)}" } },
+					{ "FechaEjecucionUtc", new AttributeValue { NULL = true } },
 					{ "Estado", new AttributeValue { S = Estado.ToString() } },
+					{ "Observacion", new AttributeValue { NULL = true } },
 					{ "TTL",  new AttributeValue { N = TTL.ToString(CultureInfo.InvariantCulture) } },
 				}
 			).ToDictionary();
+
+			if (FechaEjecucionUtc != null) item["FechaEjecucionUtc"] = new AttributeValue { S = $"{FechaEjecucionUtc.Value.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)}" };
+			if (Observacion != null) item["Observacion"] = new AttributeValue { S = Observacion };
 
 			return item;
 		}
@@ -60,8 +59,10 @@ namespace LibreriaCompartida.Entities {
 			return new Ejecucion() {
 				IdEjecucion = item["IdEjecucion"].S,
 				IdProceso = item["IdProceso"].S,
-				FechaEjecucionUtc = DateTime.ParseExact(item["FechaEjecucionUtc"].S, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+				FechaEncolamientoUtc = DateTime.ParseExact(item["FechaEncolamientoUtc"].S, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+				FechaEjecucionUtc = item["FechaEjecucionUtc"].NULL != null && item["FechaEjecucionUtc"].NULL!.Value ? null : DateTime.ParseExact(item["FechaEjecucionUtc"].S, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
 				Estado = Enum.Parse<EstadoEjecucion>(item["Estado"].S),
+				Observacion = item["Observacion"].NULL != null && item["Observacion"].NULL!.Value ? null : item["Observacion"].S,
 				TTL = int.Parse(item["TTL"].N, CultureInfo.InvariantCulture),
 			};
 		}

@@ -12,12 +12,21 @@ namespace LibreriaCompartida.Repositories {
 	public class EjecucionDao(IAmazonDynamoDB client, IVariableEntornoHelper variableEntornoHelper) {
 		private readonly string DYNAMO_TABLE_NAME = variableEntornoHelper.Obtener("DYNAMO_TABLE_NAME");
 
-		public async Task<Ejecucion> Crear(string idEjecucion, string idProceso, DateTime fechaEjecucionUtc, EstadoEjecucion estado, long ttl) {
+		public async Task<Ejecucion> Crear(string idEjecucion, string idProceso, DateTime fechaEncolamientoUtc, EstadoEjecucion estado, string? observacion, long ttl) {
 			Ejecucion item = new() {
 				IdEjecucion = idEjecucion,
 				IdProceso = idProceso,
-				FechaEjecucionUtc = fechaEjecucionUtc,
+				FechaEncolamientoUtc = fechaEncolamientoUtc,
+				FechaEjecucionUtc = null,
+				Observacion = observacion,
 				Estado = estado,
+				TTL = ttl
+			};
+
+			RelacProcEjec relacion = new() { 
+				IdProceso = idProceso,
+				IdEjecucion = idEjecucion,
+				FechaEncolamientoUtc = fechaEncolamientoUtc,
 				TTL = ttl
 			};
 
@@ -31,12 +40,19 @@ namespace LibreriaCompartida.Repositories {
 						}
 					},
 					new TransactWriteItem {
+						Put = new Put {
+							TableName = DYNAMO_TABLE_NAME,
+							Item = relacion.ToItem(),
+							ConditionExpression = "attribute_not_exists(PK)"
+						}
+					},
+					new TransactWriteItem {
 						Update = new Update {
 							TableName = DYNAMO_TABLE_NAME,
 							Key = Proceso.GenerarKey(idProceso),
 							UpdateExpression = "SET FechaUltimaEjecucionUtc = :ultimaEjecucion",
 							ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
-								[":ultimaEjecucion"] = new AttributeValue { S = fechaEjecucionUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) }
+								[":ultimaEjecucion"] = new AttributeValue { S = fechaEncolamientoUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) }
 							},
 							ConditionExpression = "attribute_exists(PK)",
 						}
@@ -53,30 +69,44 @@ namespace LibreriaCompartida.Repositories {
 			return item;
 		}
 
-		public async Task<List<Ejecucion>> ObtenerPorProceso(string idProceso) {
-			List<Ejecucion> retorno = [];
+		public async Task RegistrarFechaEjecucion(string idEjecucion, DateTime fechaEjecucionUtc, EstadoEjecucion estado, string? observacion) {
+			UpdateItemRequest request = new() {
+				TableName = DYNAMO_TABLE_NAME,
+				Key = Ejecucion.GenerarKey(idEjecucion),
+				UpdateExpression = "SET FechaEjecucionUtc = :fechaEjecucionUtc, Estado = :estado, Observacion = :observacion",
+				ConditionExpression = "attribute_exists(PK) AND (attribute_not_exists(FechaEjecucionUtc) OR FechaEjecucionUtc = :null)",
+				ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+					[":fechaEjecucionUtc"] = new AttributeValue { S = fechaEjecucionUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) },
+					[":estado"] = new AttributeValue { S = estado.ToString() },
+					[":observacion"] = observacion == null 
+						? new() { NULL = true }
+						: new() { S = observacion },
+					[":null"] = new AttributeValue { NULL = true },
+				},
+			};
 
-			Dictionary<string, AttributeValue>? lastKey = null;
+			UpdateItemResponse response = await client.UpdateItemAsync(request);
 
-			do {
-				QueryRequest request = new() {
-					TableName = DYNAMO_TABLE_NAME,
-					KeyConditionExpression = "PK = :pk AND begins_with(SK, :sk)",
-					ExpressionAttributeValues = Ejecucion.GenerarKey(idProceso),
-					ExclusiveStartKey = lastKey
-				};
+			if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+				throw new HttpRequestException("Ocurrió un error al registrar fecha de ejecución en DynamoDB");
+			}
+		}
 
-				QueryResponse response = await client.QueryAsync(request);
+		public async Task<Ejecucion?> Obtener(string idEjecucion) {
+			GetItemRequest request = new() {
+				TableName = DYNAMO_TABLE_NAME,
+				Key = Ejecucion.GenerarKey(idEjecucion)
+			};
 
-				if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
-					throw new Exception("Ocurrió un error al obtener todas las ejecución de un proceso de DynamoDB");
-				}
+			GetItemResponse response = await client.GetItemAsync(request);
 
-				retorno.AddRange(response.Items.Select(i => Ejecucion.FromItem(i)));
-				lastKey = response.LastEvaluatedKey;
-			} while (lastKey?.Count > 0);
+			if (response.HttpStatusCode != System.Net.HttpStatusCode.OK) {
+				throw new Exception("Ocurrió un error al obtener la ejecución de DynamoDB");
+			}
 
-			return retorno;
+			if (response.Item == null || response.Item.Count == 0) return null;
+
+			return Ejecucion.FromItem(response.Item);
 		}
 	}
 }
