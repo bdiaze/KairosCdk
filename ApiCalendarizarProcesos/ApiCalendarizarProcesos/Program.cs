@@ -53,7 +53,6 @@ builder.Services.AddSingleton<IAmazonScheduler>(sp => {
 #region Singleton Helpers
 builder.Services.AddSingleton<IVariableEntornoHelper, VariableEntornoHelper>();
 builder.Services.AddSingleton<ISchedulerHelper, SchedulerHelper>();
-builder.Services.AddSingleton<IDynamoHelper, DynamoHelper>();
 #endregion
 
 #region Singleton Daos
