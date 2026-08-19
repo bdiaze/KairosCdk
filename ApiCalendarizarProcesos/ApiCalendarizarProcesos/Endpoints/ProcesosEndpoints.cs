@@ -20,6 +20,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
             group.MapDeleteEndpoint();
             group.MapGetProcesosEndpoint();
             group.MapGetCalendarizacionesEndpoint();
+			group.MapMigrarModeloEndpoint();
 
 			return routes;
         }
@@ -326,6 +327,30 @@ namespace ApiCalendarizarProcesos.Endpoints {
 					LambdaLogger.Log(
 						$"[GET] - [Procesos] - [GetCalendarizaciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
 						$"Ocurrio un error al obtener las calendarizaciones según filtro - Nombre: {filtroNombre}. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
+
+		private static IEndpointRouteBuilder MapMigrarModeloEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapPost("/MigrarModelo", async (ProcesoUseCase procesoUseCase) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+                    (int calMigrados, int calTotales, int procMigrados, int procTotales) = await procesoUseCase.MigrarANuevoModelo();
+
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [MigrarModelo] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se migra exitosamente el modelo - Cal. Migrados: {calMigrados} - Cal. Totales: {calTotales} - Proc. Migrados: {procMigrados} - Proc. Totales: {procTotales}.");
+
+					return Results.Ok();
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [MigrarModelo] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al migrar el modelo. " +
 						$"{ex}");
 					return Results.Problem("Ocurrió un error al procesar su solicitud.");
 				}

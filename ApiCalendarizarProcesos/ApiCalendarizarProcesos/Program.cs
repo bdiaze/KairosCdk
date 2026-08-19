@@ -59,6 +59,9 @@ builder.Services.AddSingleton<IDynamoHelper, DynamoHelper>();
 #region Singleton Daos
 builder.Services.AddSingleton<ProcesoDao>();
 builder.Services.AddSingleton<CalendarizacionDao>();
+builder.Services.AddSingleton<EjecucionDao>();
+builder.Services.AddSingleton<RelacCalendProcDao>();
+builder.Services.AddSingleton<RelacProcEjecDao>();
 #endregion
 
 #region Singleton Business
