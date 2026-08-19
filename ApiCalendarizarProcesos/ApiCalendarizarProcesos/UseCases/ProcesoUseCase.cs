@@ -7,7 +7,14 @@ using System.Text.RegularExpressions;
 
 namespace ApiCalendarizarProcesos.UseCases {
 	public class ProcesoUseCase(CalendarizacionBusiness calendarizacionBusiness, ProcesoBusiness procesoBusiness) {
-				
+		public async Task<List<Calendarizacion>> ObtenerTodasCalendarizaciones() {
+			return await calendarizacionBusiness.ObtenerTodos();
+		}
+
+		public async Task<List<Proceso>> ObtenerTodosProcesos() {
+			return await procesoBusiness.ObtenerTodos();
+		}
+
 		public async Task<(Calendarizacion, Proceso)> RegistrarProcesoSiNoExiste(string nombre, string arnRol, string arnProceso, string parametros, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
 			Calendarizacion? calendarizacionCreada = null;
 			Schedule? scheduleCreado = null;
