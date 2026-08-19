@@ -156,7 +156,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapDelete("/{idProceso}", async (string idProceso, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
+            routes.MapDelete("/{idProceso}", async (string idProceso, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo, ProcesoUseCase procesoUseCase) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
@@ -209,7 +209,15 @@ namespace ApiCalendarizarProcesos.Endpoints {
                         });
                     }
 
-                    LambdaLogger.Log(
+					try {
+						await procesoUseCase.QuitarProcesoSiExiste(idProceso);
+					} catch (Exception ex) {
+						LambdaLogger.Log(
+							$"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [ErrorParcial] - " +
+							$"Ocurrio un error parcial. " + ex);
+					}
+
+					LambdaLogger.Log(
                         $"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
                         $"Se descalendariza exitosamente el proceso.");
 

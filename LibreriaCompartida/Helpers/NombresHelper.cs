@@ -1,6 +1,8 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace LibreriaCompartida.Helpers {
 	public static class NombresHelper {
@@ -97,7 +99,10 @@ namespace LibreriaCompartida.Helpers {
 		public static string GenerarNombreProceso(string nombre) {
 			// Se quitan tildes...
 			nombre = nombre.Normalize(NormalizationForm.FormD);
+			Console.WriteLine(nombre);
+
 			nombre = new string([.. nombre.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)]);
+			Console.WriteLine(nombre);
 
 			// Se reemplazan caracteres de posibles Cron...
 			nombre = nombre.Replace("*", "x").Replace("?", "x").Replace(",", ".");

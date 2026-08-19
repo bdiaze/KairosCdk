@@ -29,5 +29,21 @@ namespace ApiCalendarizarProcesos.UseCases {
 				throw;
 			}
 		}
+
+		public async Task QuitarProcesoSiExiste(string idProceso) {
+			Calendarizacion? calendarizacionEliminada = null;
+			Schedule? scheduleEliminado = null;
+			Proceso? procesoEliminado = null;
+			try {
+				procesoEliminado = await procesoBusiness.Eliminar(idProceso);
+				if (procesoEliminado != null) {
+					(calendarizacionEliminada, scheduleEliminado) = await calendarizacionBusiness.EliminarSiNoTieneProcesos(procesoEliminado.IdCalendarizacion);
+				}
+			} catch {
+				await calendarizacionBusiness.ReversarEliminados(calendarizacionEliminada, scheduleEliminado);
+				await procesoBusiness.ReversarEliminado(procesoEliminado);
+				throw;
+			}
+		}
 	}
 }
