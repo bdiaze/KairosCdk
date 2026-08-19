@@ -99,8 +99,21 @@ namespace LibreriaCompartida.Helpers {
 				
 		public static string GenerarNombreProceso(string nombre) {
 			// Se quitan tildes...
-			nombre = nombre.Normalize(NormalizationForm.FormKD);
-			nombre = new string([.. nombre.Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)]);
+			nombre = nombre
+				.Replace('á', 'a')
+				.Replace('é', 'e')
+				.Replace('í', 'i')
+				.Replace('ó', 'o')
+				.Replace('ú', 'u')
+				.Replace('Á', 'A')
+				.Replace('É', 'E')
+				.Replace('Í', 'I')
+				.Replace('Ó', 'O')
+				.Replace('Ú', 'U')
+				.Replace('ü', 'u')
+				.Replace('Ü', 'U')
+				.Replace('ñ', 'n')
+				.Replace('Ñ', 'N');
 
 			// Se reemplazan caracteres de posibles Cron...
 			nombre = nombre.Replace("*", "x").Replace("?", "x").Replace(",", ".");
