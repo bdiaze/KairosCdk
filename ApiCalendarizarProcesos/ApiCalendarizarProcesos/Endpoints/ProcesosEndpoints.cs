@@ -2,6 +2,8 @@
 using ApiCalendarizarProcesos.Helpers;
 using ApiCalendarizarProcesos.Interfaces.Helpers;
 using ApiCalendarizarProcesos.Models;
+using ApiCalendarizarProcesos.UseCases;
+using LibreriaCompartida.Entities;
 using LibreriaCompartida.Helpers;
 using LibreriaCompartida.Interfaces.Helpers;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +25,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
         }
 
         private static IEndpointRouteBuilder MapPostEndpoint(this IEndpointRouteBuilder routes) {
-            routes.MapPost("/", async (EntIngresarProceso entrada, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo) => {
+            routes.MapPost("/", async (EntIngresarProceso entrada, IVariableEntornoHelper variableEntorno, ISchedulerHelper scheduler, IDynamoHelper dynamo, ProcesoUseCase procesoUseCase) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
@@ -119,6 +121,22 @@ namespace ApiCalendarizarProcesos.Endpoints {
                         ["Habilitado"] = entrada.Habilitado,
                         ["FechaCreacion"] = DateTimeOffset.Now.ToString("o", CultureInfo.InvariantCulture),
                     });
+
+                    try {
+                        (Calendarizacion calendarizacion, Proceso proceso) = await procesoUseCase.RegistrarProcesoSiNoExiste(
+                            entrada.Nombre,
+                            entrada.ArnRol,
+                            entrada.ArnProceso,
+                            entrada.Parametros,
+                            entrada.Cron,
+                            entrada.FrecuenciaDias,
+                            entrada.InicioEjecucionUtc
+                        );
+                    } catch (Exception ex) {
+						LambdaLogger.Log(
+						    $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [ErrorParcial] - " +
+							$"Ocurrio un error parcial. " + ex);
+					}
 
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +

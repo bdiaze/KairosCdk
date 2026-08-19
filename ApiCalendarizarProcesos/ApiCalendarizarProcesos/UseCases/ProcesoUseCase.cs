@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace ApiCalendarizarProcesos.UseCases {
 	public class ProcesoUseCase(CalendarizacionBusiness calendarizacionBusiness, ProcesoBusiness procesoBusiness) {
-		public async Task RegistrarProcesoSiNoExiste(string nombre, string arnRol, string arnProceso, string parametros, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
+		public async Task<(Calendarizacion, Proceso)> RegistrarProcesoSiNoExiste(string nombre, string arnRol, string arnProceso, string parametros, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
 			Calendarizacion? calendarizacionCreada = null;
 			Schedule? scheduleCreado = null;
 			Proceso? procesoCreado = null;
@@ -21,6 +21,8 @@ namespace ApiCalendarizarProcesos.UseCases {
 
 				(Calendarizacion calendarizacion, scheduleCreado, calendarizacionCreada) = await calendarizacionBusiness.ObtenerOCrear(cron, frecuenciaDias, inicioEjecucionUtc);
 				(Proceso proceso, procesoCreado) = await procesoBusiness.ObtenerOCrear(nombre, arnRol, arnProceso, parametros, calendarizacion.IdCalendarizacion);
+
+				return (calendarizacion, proceso);
 			} catch {
 				await procesoBusiness.ReversarCreado(procesoCreado);
 				await calendarizacionBusiness.ReversarCreados(scheduleCreado, calendarizacionCreada);
