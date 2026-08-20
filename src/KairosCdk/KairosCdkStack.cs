@@ -72,37 +72,6 @@ namespace KairosCdk
 				BillingMode = BillingMode.PAY_PER_REQUEST,
 				RemovalPolicy = RemovalPolicy.DESTROY
 			});
-
-            // Se crean tablas para registrar los procesos y calendarizaciones...
-            Table tablaProcesos = new(this, $"{appName}DynamoDBTableProcesos", new TableProps {
-                TableName = $"{appName}Procesos",
-                PartitionKey = new Attribute { 
-                    Name = "IdProceso",
-                    Type = AttributeType.STRING
-                },
-                DeletionProtection = false,
-                BillingMode = BillingMode.PAY_PER_REQUEST,
-                RemovalPolicy = RemovalPolicy.DESTROY
-            });
-
-            tablaProcesos.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps {
-                IndexName = $"PorIdCalendarizacion",
-                PartitionKey = new Attribute {
-                    Name = "IdCalendarizacion",
-                    Type = AttributeType.STRING
-                },
-            });
-
-            Table tablaCalendarizacion = new(this, $"{appName}DynamoDBTableCalendarizacion", new TableProps {
-                TableName = $"{appName}Calendarizaciones",
-                PartitionKey = new Attribute {
-                    Name = "IdCalendarizacion",
-                    Type = AttributeType.STRING
-                },
-                DeletionProtection = false,
-                BillingMode = BillingMode.PAY_PER_REQUEST,
-                RemovalPolicy = RemovalPolicy.DESTROY
-            });
             #endregion
 
             #region Scheduler
