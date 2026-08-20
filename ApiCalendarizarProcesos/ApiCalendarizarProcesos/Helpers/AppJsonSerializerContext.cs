@@ -15,6 +15,7 @@ namespace ApiCalendarizarProcesos.Helpers {
 	[JsonSerializable(typeof(Proceso))]
 	[JsonSerializable(typeof(List<Proceso>))]
 	[JsonSerializable(typeof(List<Calendarizacion>))]
+	[JsonSerializable(typeof(List<Ejecucion>))]
 	internal partial class AppJsonSerializerContext : JsonSerializerContext {
 
     }

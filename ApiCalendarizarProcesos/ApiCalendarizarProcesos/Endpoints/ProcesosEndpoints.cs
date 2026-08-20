@@ -13,7 +13,8 @@ namespace ApiCalendarizarProcesos.Endpoints {
             RouteGroupBuilder group = routes.MapGroup("/Procesos");
             group.MapPostEndpoint();
             group.MapDeleteEndpoint();
-            group.MapGetProcesosEndpoint();
+			group.MapGetEjecucionesEndpoint();
+			group.MapGetProcesosEndpoint();
             group.MapGetCalendarizacionesEndpoint();
 
 			return routes;
@@ -103,17 +104,68 @@ namespace ApiCalendarizarProcesos.Endpoints {
             return routes;
         }
 
-		private static IEndpointRouteBuilder MapGetProcesosEndpoint(this IEndpointRouteBuilder routes) {
-			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, ProcesoUseCase procesoUseCase) => {
+		private static IEndpointRouteBuilder MapGetEjecucionesEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapGet("/Ejecuciones", async ([FromQuery] string? formato, [FromQuery] string filtroIdProceso, ProcesoUseCase procesoUseCase) => {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
-					List<Proceso> retorno = [.. (await procesoUseCase.ObtenerTodosProcesos())
-						.Where(p => {
-							if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
-							return p.Nombre.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
-						})
-					];
+					List<Ejecucion> retorno = await procesoUseCase.ObtenerEjecucionesPorProceso(filtroIdProceso);
+
+					formato ??= "json";
+					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
+						byte[] csv = CsvHelper.ToCsv([.. retorno.Select(r => new Dictionary<string, object?>() {
+							["IdEjecucion"] = r.IdEjecucion,
+							["IdProceso"] = r.IdProceso,
+							["FechaEncolamientoUtc"] = r.FechaEncolamientoUtc,
+							["FechaEjecucionUtc"] = r.FechaEjecucionUtc,
+							["Estado"] = r.Estado,
+							["Observacion"] = r.Observacion,
+						})]);
+
+						LambdaLogger.Log(
+							$"[GET] - [Procesos] - [GetEjecuciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+							$"Se obtienen exitosamente las ejecuciones en formato CSV - Cantidad: {retorno.Count}.");
+
+						return Results.File(
+							csv,
+							"text/csv",
+							$"Ejecuciones_{Guid.NewGuid()}.csv"
+						);
+					}
+
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetEjecuciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se obtienen exitosamente las ejecuciones - Cantidad: {retorno.Count}.");
+
+					return Results.Ok(retorno);
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[GET] - [Procesos] - [GetEjecuciones] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al obtener las ejecuciones según proceso - Id Proceso: {filtroIdProceso}. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
+
+		private static IEndpointRouteBuilder MapGetProcesosEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapGet("/Procesos", async ([FromQuery] string? formato, [FromQuery] string? filtroNombre, [FromQuery] string? filtroIdCalendarizacion, ProcesoUseCase procesoUseCase) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+					List<Proceso> retorno;
+					if (string.IsNullOrWhiteSpace(filtroIdCalendarizacion)) {
+						retorno = await procesoUseCase.ObtenerTodosProcesos();
+					} else {
+						retorno = await procesoUseCase.ObtenerProcesosPorCalendarizacion(filtroIdCalendarizacion);
+					}
+
+					retorno = [.. retorno.Where(p => {
+						if (string.IsNullOrWhiteSpace(filtroNombre)) return true;
+						return p.Nombre.Contains(filtroNombre, StringComparison.InvariantCultureIgnoreCase);
+					})];
 
                     formato ??= "json";
 					if (formato.Equals("csv", StringComparison.InvariantCultureIgnoreCase)) {
@@ -147,7 +199,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
 				} catch (Exception ex) {
 					LambdaLogger.Log(
 						$"[GET] - [Procesos] - [GetProcesos] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
-						$"Ocurrio un error al obtener los procesos según filtro - Nombre: {filtroNombre}. " +
+						$"Ocurrio un error al obtener los procesos según filtro - Nombre: {filtroNombre} - Id Calendarización: {filtroIdCalendarizacion}. " +
 						$"{ex}");
 					return Results.Problem("Ocurrió un error al procesar su solicitud.");
 				}
