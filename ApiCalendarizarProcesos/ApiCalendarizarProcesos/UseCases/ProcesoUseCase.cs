@@ -15,6 +15,14 @@ namespace ApiCalendarizarProcesos.UseCases {
 			return await procesoBusiness.ObtenerTodos();
 		}
 
+		public async Task<List<Proceso>> ObtenerProcesosPorCalendarizacion(string idCalendarizacion) {
+			return await procesoBusiness.ObtenerPorCalendarizacion(idCalendarizacion);
+		}
+
+		public async Task<List<Ejecucion>> ObtenerEjecucionesPorProceso(string idProceso) {
+			return await procesoBusiness.ObtenerEjecuciones(idProceso);
+		}
+
 		public async Task<(Calendarizacion, Proceso)> RegistrarProcesoSiNoExiste(string nombre, string arnRol, string arnProceso, string parametros, string? cron, int? frecuenciaDias, DateTime? inicioEjecucionUtc) {
 			Calendarizacion? calendarizacionCreada = null;
 			Schedule? scheduleCreado = null;
