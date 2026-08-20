@@ -25,12 +25,13 @@ namespace LibreriaCompartida.Entities {
 		public required DateTime? FechaEjecucionUtc { get; set; }
 
 		[JsonPropertyName("Estado")]
+		[JsonConverter(typeof(JsonStringEnumConverter))]
 		public required EstadoEjecucion Estado { get; set; }
 
 		[JsonPropertyName("Observacion")]
 		public required string? Observacion { get; set; }
 
-		[JsonIgnore]
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
 		public required long TTL { get; set; }
 
 		public static string GenerarPK() {
