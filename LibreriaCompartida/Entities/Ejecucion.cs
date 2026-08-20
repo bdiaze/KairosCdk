@@ -25,7 +25,7 @@ namespace LibreriaCompartida.Entities {
 		public required DateTime? FechaEjecucionUtc { get; set; }
 
 		[JsonPropertyName("Estado")]
-		[JsonConverter(typeof(JsonStringEnumConverter))]
+		[JsonConverter(typeof(JsonStringEnumConverter<EstadoEjecucion>))]
 		public required EstadoEjecucion Estado { get; set; }
 
 		[JsonPropertyName("Observacion")]
