@@ -80,7 +80,7 @@ namespace KairosCdk
                     Name = "IdProceso",
                     Type = AttributeType.STRING
                 },
-                DeletionProtection = true,
+                DeletionProtection = false,
                 BillingMode = BillingMode.PAY_PER_REQUEST,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
@@ -99,7 +99,7 @@ namespace KairosCdk
                     Name = "IdCalendarizacion",
                     Type = AttributeType.STRING
                 },
-                DeletionProtection = true,
+                DeletionProtection = false,
                 BillingMode = BillingMode.PAY_PER_REQUEST,
                 RemovalPolicy = RemovalPolicy.DESTROY
             });
@@ -437,14 +437,9 @@ namespace KairosCdk
                                         "dynamodb:DeleteItem",
                                         "dynamodb:GetItem",
                                         "dynamodb:Query",
-										"dynamodb:Scan",
 										"dynamodb:TransactWriteItems"
 									],
                                     Resources = [
-                                        tablaProcesos.TableArn,
-                                        $"{tablaProcesos.TableArn}/*",
-                                        tablaCalendarizacion.TableArn,
-                                        $"{tablaCalendarizacion.TableArn}/*",
 										tablaApp.TableArn,
 									],
                                 }),
@@ -477,8 +472,6 @@ namespace KairosCdk
                 Environment = new Dictionary<string, string> {
                     { "APP_NAME", appName },
 					{ "DYNAMO_TABLE_NAME", tablaApp.TableName },
-					{ "DYNAMO_TABLE_PROCESOS_NAME", tablaProcesos.TableName },
-					{ "DYNAMO_TABLE_CALENDARIZACIONES_NAME", tablaCalendarizacion.TableName },
 					{ "NOMBRE_SCHEDULE_GROUP", scheduleGroup.Name },
 					{ "ARN_ROLE_SCHEDULE", roleScheduler.RoleArn },
 					{ "ARN_DLQ_SCHEDULE", schedulerDlq.QueueArn },
