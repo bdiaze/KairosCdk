@@ -3,9 +3,37 @@ using LibreriaCompartida.Helpers;
 using LibreriaCompartida.Repositories;
 
 namespace ApiCalendarizarProcesos.Business {
-	public class ProcesoBusiness(ProcesoDao procesoDao) {
+	public class ProcesoBusiness(ProcesoDao procesoDao, RelacCalendProcDao relacCalendProcDao, RelacProcEjecDao relacProcEjecDao, EjecucionDao ejecucionDao) {
 		public async Task<List<Proceso>> ObtenerTodos() {
 			return await procesoDao.ObtenerTodos();
+		}
+
+		public async Task<List<Proceso>> ObtenerPorCalendarizacion(string idCalendarizacion) {
+			List<RelacCalendProc> relaciones = await relacCalendProcDao.ObtenerPorCalendarizacion(idCalendarizacion);
+
+			List<Proceso> retorno = [];
+			foreach (RelacCalendProc relacion in relaciones) {
+				Proceso? proceso = await procesoDao.Obtener(relacion.IdProceso);
+				if (proceso != null) {
+					retorno.Add(proceso);
+				}
+			}
+
+			return retorno;
+		}
+
+		public async Task<List<Ejecucion>> ObtenerEjecuciones(string idProceso) {
+			List<RelacProcEjec> relaciones = await relacProcEjecDao.ObtenerPorProceso(idProceso);
+
+			List<Ejecucion> retorno = [];
+			foreach (RelacProcEjec relacion in relaciones) {
+				Ejecucion? ejecucion = await ejecucionDao.Obtener(relacion.IdEjecucion);
+				if (ejecucion != null) {
+					retorno.Add(ejecucion);
+				}
+			}
+
+			return retorno;
 		}
 
 		public async Task<(Proceso, Proceso? procesoCreado)> ObtenerOCrear(string nombre, string arnRol, string arnProceso, string parametros, string idCalendarizacion) {
