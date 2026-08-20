@@ -1,4 +1,5 @@
 ﻿using Amazon.Lambda.Core;
+using ApiCalendarizarProcesos.Exceptions;
 using ApiCalendarizarProcesos.Helpers;
 using ApiCalendarizarProcesos.Models;
 using ApiCalendarizarProcesos.UseCases;
@@ -12,7 +13,9 @@ namespace ApiCalendarizarProcesos.Endpoints {
         public static IEndpointRouteBuilder MapProcesosEndpoints(this IEndpointRouteBuilder routes) {
             RouteGroupBuilder group = routes.MapGroup("/Procesos");
             group.MapPostEndpoint();
-            group.MapDeleteEndpoint();
+			group.MapPostVariosEndpoint();
+			group.MapDeleteEndpoint();
+			group.MapDeleteVariosEndpoint();
 			group.MapGetEjecucionesEndpoint();
 			group.MapGetProcesosEndpoint();
             group.MapGetCalendarizacionesEndpoint();
@@ -25,35 +28,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
-                    // Se limpia la entrada...
-                    entrada.Nombre = Regex.Replace(entrada.Nombre.Trim(), @"\s+", " ", RegexOptions.NonBacktracking);
-                    if (entrada.Cron != null) entrada.Cron = Regex.Replace(entrada.Cron.Trim(), @"\s+", " ", RegexOptions.NonBacktracking).ToUpperInvariant();
-
-                    // Se valida que venga cron o frecuencia en días (no ambos al mismo tiempo)...
-                    if ((entrada.Cron == null && entrada.FrecuenciaDias == null) || (entrada.Cron != null && entrada.FrecuenciaDias != null)) {
-						LambdaLogger.Log(
-						    $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
-						    $"Se debe indicar una configuración cron o una frecuencia en días.");
-						return Results.BadRequest("Se debe indicar una configuración cron o una frecuencia en días.");
-					}
-
-                    // Se valida que si viene frecuencia en días, también se incluya el inicio de las ejecuciones...
-                    if (entrada.FrecuenciaDias != null && entrada.InicioEjecucionUtc == null) {
-						LambdaLogger.Log(
-							$"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
-							$"Junto con indicar la frecuencia en días, se debe indicar la fecha en que inicia la ejecución del proceso.");
-						return Results.BadRequest("Junto con indicar la frecuencia en días, se debe indicar la fecha en que inicia la ejecución del proceso.");
-					}
-
-                    // Se valida que la fecha de inicio de ejecución sea futura...
-                    if (entrada.InicioEjecucionUtc != null && entrada.InicioEjecucionUtc <= DateTime.UtcNow) {
-                        LambdaLogger.Log(
-                            $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
-                            $"La fecha de inicio de ejecución debe ser una fecha futura.");
-                        return Results.BadRequest("La fecha de inicio de ejecución debe ser una fecha futura.");
-					}
-
-					(_, Proceso proceso) = await procesoUseCase.RegistrarProcesoSiNoExiste(
+					(_, Proceso proceso, _, _, _) = await procesoUseCase.RegistrarProcesoSiNoExiste(
                         entrada.Nombre,
                         entrada.ArnRol,
                         entrada.ArnProceso,
@@ -66,9 +41,14 @@ namespace ApiCalendarizarProcesos.Endpoints {
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
                         $"Se programa exitosamente el proceso.");
-
                     return Results.Ok(proceso);
-                } catch (Exception ex) {
+				} catch (ErrorValidacion ex) {
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+						$"Ocurrió un error de validación. " +
+						$"{ex}");
+					return Results.BadRequest(ex.MensajeGenerico);
+				} catch (Exception ex) {
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
                         $"Ocurrio un error al programar el proceso. " +
@@ -80,7 +60,38 @@ namespace ApiCalendarizarProcesos.Endpoints {
             return routes;
         }
 
-        private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
+		private static IEndpointRouteBuilder MapPostVariosEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapPost("/Varios", async (List<EntIngresarProceso> entrada, ProcesoUseCase procesoUseCase) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+					(_, List<Proceso> procesos, _, _) = await procesoUseCase.RegistrarVariosProcesosSiNoExisten(
+						entrada.Select(e => (e.Nombre, e.ArnRol, e.ArnProceso, e.Parametros, e.Cron, e.FrecuenciaDias, e.InicioEjecucionUtc)).ToList()
+					);
+
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [IngresarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se programan exitosamente los procesos.");
+					return Results.Ok(procesos);
+				} catch (ErrorValidacion ex) {
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [IngresarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+						$"Ocurrió un error de validación. " +
+						$"{ex}");
+					return Results.BadRequest(ex.MensajeGenerico);
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[POST] - [Procesos] - [IngresarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al programar los procesos. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
+
+		private static IEndpointRouteBuilder MapDeleteEndpoint(this IEndpointRouteBuilder routes) {
             routes.MapDelete("/{idProceso}", async (string idProceso, ProcesoUseCase procesoUseCase) => {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
@@ -92,7 +103,13 @@ namespace ApiCalendarizarProcesos.Endpoints {
                         $"Se descalendariza exitosamente el proceso.");
 
                     return Results.Ok();
-                } catch (Exception ex) {
+				} catch (ErrorValidacion ex) {
+					LambdaLogger.Log(
+						$"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+						$"Ocurrió un error de validación. " +
+						$"{ex}");
+					return Results.BadRequest(ex.MensajeGenerico);
+				} catch (Exception ex) {
                     LambdaLogger.Log(
                         $"[DELETE] - [Procesos] - [Eliminar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
                         $"Ocurrio un error al descalendarizar el proceso. " +
@@ -103,6 +120,35 @@ namespace ApiCalendarizarProcesos.Endpoints {
 
             return routes;
         }
+
+		private static IEndpointRouteBuilder MapDeleteVariosEndpoint(this IEndpointRouteBuilder routes) {
+			routes.MapDelete("/Varios", async (List<string> idsProcesos, ProcesoUseCase procesoUseCase) => {
+				Stopwatch stopwatch = Stopwatch.StartNew();
+
+				try {
+					await procesoUseCase.QuitarVariosProcesosSiExisten(idsProcesos);
+
+					LambdaLogger.Log(
+						$"[DELETE] - [Procesos] - [EliminarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
+						$"Se descalendarizan exitosamente los procesos.");
+					return Results.Ok();
+				} catch (ErrorValidacion ex) {
+					LambdaLogger.Log(
+						$"[DELETE] - [Procesos] - [EliminarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
+						$"Ocurrió un error de validación. " +
+						$"{ex}");
+					return Results.BadRequest(ex.MensajeGenerico);
+				} catch (Exception ex) {
+					LambdaLogger.Log(
+						$"[DELETE] - [Procesos] - [EliminarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status500InternalServerError}] - " +
+						$"Ocurrio un error al descalendarizar los procesos. " +
+						$"{ex}");
+					return Results.Problem("Ocurrió un error al procesar su solicitud.");
+				}
+			});
+
+			return routes;
+		}
 
 		private static IEndpointRouteBuilder MapGetEjecucionesEndpoint(this IEndpointRouteBuilder routes) {
 			routes.MapGet("/Ejecuciones", async ([FromQuery] string? formato, [FromQuery] string filtroIdProceso, ProcesoUseCase procesoUseCase) => {
