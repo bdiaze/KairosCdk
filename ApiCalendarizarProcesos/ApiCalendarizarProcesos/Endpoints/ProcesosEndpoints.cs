@@ -28,7 +28,7 @@ namespace ApiCalendarizarProcesos.Endpoints {
                 Stopwatch stopwatch = Stopwatch.StartNew();
 
                 try {
-					(_, Proceso proceso, _, _, _) = await procesoUseCase.RegistrarProcesoSiNoExiste(
+					(Calendarizacion calendarizacion, Proceso proceso, _, _, _) = await procesoUseCase.RegistrarProcesoSiNoExiste(
                         entrada.Nombre,
                         entrada.ArnRol,
                         entrada.ArnProceso,
@@ -38,10 +38,22 @@ namespace ApiCalendarizarProcesos.Endpoints {
                         entrada.InicioEjecucionUtc
                     );
 
+					SalIngresarProceso retorno = new() {
+						IdProceso = proceso.IdProceso,
+						IdCalendarizacion = calendarizacion.IdCalendarizacion,
+						Nombre = proceso.Nombre,
+						ArnRol = proceso.ArnRol,
+						ArnProceso = proceso.ArnProceso,
+						Parametros = proceso.Parametros,
+						Cron = calendarizacion.Cron,
+						FrecuenciaDias = calendarizacion.FrecuenciaDias,
+						InicioEjecucionUtc = calendarizacion.InicioEjecucionUtc
+					};
+
                     LambdaLogger.Log(
                         $"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
                         $"Se programa exitosamente el proceso.");
-                    return Results.Ok(proceso);
+                    return Results.Ok(retorno);
 				} catch (ErrorValidacion ex) {
 					LambdaLogger.Log(
 						$"[POST] - [Procesos] - [Ingresar] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
@@ -65,14 +77,30 @@ namespace ApiCalendarizarProcesos.Endpoints {
 				Stopwatch stopwatch = Stopwatch.StartNew();
 
 				try {
-					(_, List<Proceso> procesos, _, _) = await procesoUseCase.RegistrarVariosProcesosSiNoExisten(
+					(List<Calendarizacion> calendarizaciones, List<Proceso> procesos, _, _) = await procesoUseCase.RegistrarVariosProcesosSiNoExisten(
 						entrada.Select(e => (e.Nombre, e.ArnRol, e.ArnProceso, e.Parametros, e.Cron, e.FrecuenciaDias, e.InicioEjecucionUtc)).ToList()
 					);
+					Dictionary<string, Calendarizacion> dictCalendarizaciones = calendarizaciones.ToDictionary(c => c.IdCalendarizacion, c => c);
+
+					List<SalIngresarProceso> retorno = procesos.Select(proceso => {
+						Calendarizacion calendarizacion = dictCalendarizaciones[proceso.IdCalendarizacion];
+						return new SalIngresarProceso() {
+							IdProceso = proceso.IdProceso,
+							IdCalendarizacion = calendarizacion.IdCalendarizacion,
+							Nombre = proceso.Nombre,
+							ArnRol = proceso.ArnRol,
+							ArnProceso = proceso.ArnProceso,
+							Parametros = proceso.Parametros,
+							Cron = calendarizacion.Cron,
+							FrecuenciaDias = calendarizacion.FrecuenciaDias,
+							InicioEjecucionUtc = calendarizacion.InicioEjecucionUtc
+						};
+					}).ToList();
 
 					LambdaLogger.Log(
 						$"[POST] - [Procesos] - [IngresarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status200OK}] - " +
 						$"Se programan exitosamente los procesos.");
-					return Results.Ok(procesos);
+					return Results.Ok(retorno);
 				} catch (ErrorValidacion ex) {
 					LambdaLogger.Log(
 						$"[POST] - [Procesos] - [IngresarVarios] - [{stopwatch.ElapsedMilliseconds} ms] - [{StatusCodes.Status400BadRequest}] - " +
